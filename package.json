@@ -2,7 +2,13 @@
   "name": "laundry",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest"
+    "@tailwindcss/cli": "^4.2.4",
+    "@types/bun": "latest",
+    "tailwindcss": "^4.2.4"
+  },
+  "scripts": {
+    "dev": "bun run src/index.js",
+    "css": "bunx @tailwindcss/cli -i ./public/css/main.css -o ./public/css/output.css --watch"
   },
   "peerDependencies": {
     "typescript": "^5"
