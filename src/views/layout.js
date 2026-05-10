@@ -20,7 +20,10 @@ export function layout({ title = 'Laundry', body = '', user = null } = {}) {
 function renderNav(user) {
   return `<nav class="bg-white border-b border-slate-200">
     <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
-      <span class="font-semibold">Laundry</span>
+      <div class="flex items-center gap-6">
+        <a href="/" class="font-semibold">Laundry</a>
+        <a href="/clients" class="text-sm text-slate-600 hover:text-slate-900">Clientes</a>
+      </div>
       <div class="flex items-center gap-4 text-sm">
         <span class="text-slate-600">${user.name} (${user.role})</span>
         <button

@@ -15,6 +15,7 @@ export const schema = `
     name TEXT NOT NULL,
     phone TEXT,
     notes TEXT,
+    is_active INTEGER DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 

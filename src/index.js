@@ -5,6 +5,7 @@ import { seedAdmin } from './db/seed.js'
 import { requireAuth } from './middleware/auth.js'
 import { layout } from './views/layout.js'
 import authRoutes from './routes/auth.js'
+import clientsRoutes from './routes/clients.js'
 
 await seedAdmin()
 
@@ -17,6 +18,7 @@ app.get('/ping', (c) => c.json({ status: 'ok' }))
 app.use('*', requireAuth)
 
 app.route('/', authRoutes)
+app.route('/', clientsRoutes)
 
 app.get('/', (c) => {
   const user = c.get('user')
