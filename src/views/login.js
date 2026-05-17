@@ -1,4 +1,5 @@
 import { layout } from './layout.js'
+import { escapeHtml } from './_helpers.js'
 
 export function loginPage() {
   const body = `
@@ -51,12 +52,4 @@ export function loginPage() {
 
 export function loginError(message) {
   return `<span>${escapeHtml(message)}</span>`
-}
-
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
 }
