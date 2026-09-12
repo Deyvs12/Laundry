@@ -1,3 +1,5 @@
+import { escapeHtml } from './_helpers.js'
+
 export function layout({ title = 'Laundry', body = '', user = null } = {}) {
   return `<!doctype html>
 <html lang="es">
@@ -22,11 +24,12 @@ function renderNav(user) {
     <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
       <div class="flex items-center gap-6">
         <a href="/" class="font-semibold">Laundry</a>
+        <a href="/orders" class="text-sm text-slate-600 hover:text-slate-900">Pedidos</a>
         <a href="/clients" class="text-sm text-slate-600 hover:text-slate-900">Clientes</a>
         <a href="/services" class="text-sm text-slate-600 hover:text-slate-900">Servicios</a>
       </div>
       <div class="flex items-center gap-4 text-sm">
-        <span class="text-slate-600">${user.name} (${user.role})</span>
+        <span class="text-slate-600">${escapeHtml(user.name)} (${escapeHtml(user.role)})</span>
         <button
           hx-post="/auth/logout"
           class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300">

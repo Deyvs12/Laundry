@@ -31,7 +31,14 @@ export async function login(c) {
     return c.html(loginError('Credenciales inválidas'))
   }
 
-  const ok = await Bun.password.verify(password, user.password)
+  // verify lanza (no devuelve false) si el hash guardado no es válido, por
+  // ejemplo si alguien metió una contraseña en texto plano a mano en la DB.
+  let ok = false
+  try {
+    ok = await Bun.password.verify(password, user.password)
+  } catch {
+    ok = false
+  }
   if (!ok) {
     return c.html(loginError('Credenciales inválidas'))
   }

@@ -23,6 +23,39 @@ export function list({ type = null } = {}) {
     .all()
 }
 
+// Solo lo que se puede vender hoy: alimenta el selector de pedidos.
+export function listActive() {
+  return db
+    .query(`SELECT ${COLUMNS} FROM Services WHERE is_active = 1 ORDER BY type, name`)
+    .all()
+}
+
+// Buscador del mostrador: filtra por nombre y/o tipo y acota el resultado.
+// Devuelve también el total sin recortar, para poder avisar cuándo hay más
+// coincidencias de las que se están mostrando.
+export function searchActive({ term = '', type = null, limit = 12 } = {}) {
+  const where = ['is_active = 1']
+  const params = []
+
+  if (term) {
+    where.push(`name LIKE ? ESCAPE '\\'`)
+    params.push(`%${term.replace(/[\\%_]/g, (m) => '\\' + m)}%`)
+  }
+  if (type) {
+    where.push('type = ?')
+    params.push(type)
+  }
+
+  const clause = where.join(' AND ')
+
+  return {
+    total: db.query(`SELECT COUNT(*) n FROM Services WHERE ${clause}`).get(...params).n,
+    rows: db
+      .query(`SELECT ${COLUMNS} FROM Services WHERE ${clause} ORDER BY type, name LIMIT ?`)
+      .all(...params, limit)
+  }
+}
+
 export function findById(id) {
   return db.query(`SELECT ${COLUMNS} FROM Services WHERE id = ?`).get(id)
 }

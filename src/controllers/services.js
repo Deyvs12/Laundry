@@ -1,5 +1,6 @@
 import * as services from '../services/services.js'
 import { isServiceType, isPriceType } from '../constants.js'
+import { round2 } from '../money.js'
 import { layout } from '../views/layout.js'
 import { servicesList, renderTbody, renderRow } from '../views/services/list.js'
 import { serviceNewForm, serviceEditRow } from '../views/services/form.js'
@@ -23,7 +24,9 @@ function readForm(form) {
     return { values, error: 'El precio debe ser un número mayor o igual a 0' }
   }
 
-  return { values, error: null, data: { ...values, price } }
+  // A 2 decimales desde el alta: un precio de 25.555 haría que el subtotal de
+  // 1 pieza (25.56) no coincidiera con el precio unitario mostrado.
+  return { values, error: null, data: { ...values, price: round2(price) } }
 }
 
 function filterFrom(source) {

@@ -1,8 +1,15 @@
 import { Database } from 'bun:sqlite'
+import { join } from 'node:path'
 import { schema } from './schema.js'
 import { runMigrations } from './migrations.js'
 
-const db = new Database('lavanderia.db')
+// Ruta absoluta: si el servidor arranca desde otro directorio (systemd, un
+// atajo del escritorio), una ruta relativa crearía una base vacía en silencio.
+// LAVANDERIA_DB permite apuntar a otra base (pruebas, restaurar un respaldo).
+export const DB_PATH =
+  process.env.LAVANDERIA_DB || join(import.meta.dir, '..', '..', 'lavanderia.db')
+
+const db = new Database(DB_PATH)
 
 // Va en su propio exec y se verifica: foreign_keys es por conexión, y el
 // PRAGMA es no-op silencioso si cae dentro de una transacción. Si alguna vez
