@@ -1,6 +1,4 @@
 export const schema = `
-  PRAGMA foreign_keys = ON;
-
   CREATE TABLE IF NOT EXISTS Users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
@@ -29,20 +27,36 @@ export const schema = `
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS Cash_shifts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    opening_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    closing_time DATETIME,
+    initial_cash REAL NOT NULL,
+    expected_cash REAL DEFAULT 0,
+    actual_cash REAL,
+    difference REAL,
+    status TEXT CHECK(status IN ('open', 'closed')) DEFAULT 'open',
+    FOREIGN KEY (user_id) REFERENCES Users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS Orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     id_client INTEGER NOT NULL,
     id_user INTEGER NOT NULL,
     status TEXT CHECK(status IN ('received', 'in_process', 'ready', 'delivered', 'cancelled')) DEFAULT 'received',
+    discount REAL DEFAULT 0,
     total REAL DEFAULT 0,
     paid INTEGER DEFAULT 0,
     payment_day DATETIME,
     payment_method TEXT CHECK(payment_method IN ('cash', 'transfer')),
+    cash_shift_id INTEGER,
     notes TEXT,
     expected_delivery_date DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_client) REFERENCES Clients(id),
-    FOREIGN KEY (id_user) REFERENCES Users(id)
+    FOREIGN KEY (id_user) REFERENCES Users(id),
+    FOREIGN KEY (cash_shift_id) REFERENCES Cash_shifts(id)
   );
 
   CREATE TABLE IF NOT EXISTS Order_services (
@@ -58,19 +72,6 @@ export const schema = `
     FOREIGN KEY (id_services) REFERENCES Services(id)
   );
 
-  CREATE TABLE IF NOT EXISTS Cash_shifts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    opening_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    closing_time DATETIME,
-    initial_cash REAL NOT NULL,
-    expected_cash REAL DEFAULT 0,
-    actual_cash REAL,
-    difference REAL,
-    status TEXT CHECK(status IN ('open', 'closed')) DEFAULT 'open',
-    FOREIGN KEY (user_id) REFERENCES Users(id)
-  );
-
   CREATE TABLE IF NOT EXISTS Logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -79,6 +80,7 @@ export const schema = `
     action TEXT CHECK(action IN (
       'ORDER_CREATED',
       'ORDER_STATUS_CHANGED',
+      'ORDER_DISCOUNTED',
       'ORDER_PAID',
       'ORDER_CANCELLED',
       'SHIFT_OPENED',

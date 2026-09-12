@@ -23,6 +23,7 @@ function renderNav(user) {
       <div class="flex items-center gap-6">
         <a href="/" class="font-semibold">Laundry</a>
         <a href="/clients" class="text-sm text-slate-600 hover:text-slate-900">Clientes</a>
+        <a href="/services" class="text-sm text-slate-600 hover:text-slate-900">Servicios</a>
       </div>
       <div class="flex items-center gap-4 text-sm">
         <span class="text-slate-600">${user.name} (${user.role})</span>
