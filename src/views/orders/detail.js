@@ -11,7 +11,7 @@ import { isFinal } from '../../services/orders.js'
 // Todo el detalle es un solo fragmento (#order-detail). Cada acción lo
 // devuelve completo: es lo más simple y garantiza que estado, líneas y
 // botones nunca se desincronicen entre sí.
-export function orderDetail(order, lines, { error = null } = {}) {
+export function orderDetail(order, lines, { error = null, shift = null } = {}) {
   const subtotal = lines.reduce((sum, l) => sum + l.sub_total, 0)
   const final = isFinal(order.status)
   const act = (path) =>
@@ -54,7 +54,7 @@ export function orderDetail(order, lines, { error = null } = {}) {
     </table>
 
     <div class="flex flex-col md:flex-row md:justify-between gap-6">
-      <div class="flex-1">${actions(order, lines, final, act)}</div>
+      <div class="flex-1">${actions(order, lines, final, act, shift)}</div>
 
       <div class="text-sm space-y-1 w-full md:w-64">
         <div class="flex justify-between">
@@ -79,7 +79,7 @@ function field(label, value) {
 function paymentSummary(order) {
   if (!order.paid) return '<span class="text-amber-700">Pendiente</span>'
   return `Pagado · ${escapeHtml(paymentMethodLabel(order.payment_method))} · ${formatDateTime(order.payment_day)}${
-    order.cash_shift_id ? ` · turno #${order.cash_shift_id}` : ''
+    order.cash_shift_id ? ` · <a href="/cash/${order.cash_shift_id}" class="text-blue-600">turno #${order.cash_shift_id}</a>` : ''
   }`
 }
 
@@ -105,7 +105,7 @@ function lineRow(order, line, final, act) {
   `
 }
 
-function actions(order, lines, final, act) {
+function actions(order, lines, final, act, shift) {
   if (final) {
     return `<p class="text-sm text-slate-500">Pedido ${escapeHtml(orderStatusLabel(order.status).toLowerCase())}. No admite más cambios.</p>`
   }
@@ -128,9 +128,13 @@ function actions(order, lines, final, act) {
     )
   }
 
+  const noShiftHint = shift
+    ? ''
+    : `<p class="text-xs text-amber-700 mt-3">No hay turno de caja abierto: el cobro quedará registrado <strong>sin turno</strong> y no entrará en ningún corte.</p>`
+
   const payForm = order.paid
     ? ''
-    : `<div id="pay-form" class="flex items-end gap-2 mt-3 pt-3 border-t border-slate-200">
+    : `${noShiftHint}<div id="pay-form" class="flex items-end gap-2 ${shift ? 'mt-3 pt-3 border-t border-slate-200' : 'mt-1'}">
         <div>
           <label class="block text-xs text-slate-500 mb-1" for="payment_method">Forma de pago</label>
           <select id="payment_method" name="payment_method" class="border border-slate-300 rounded px-3 py-2 text-sm">

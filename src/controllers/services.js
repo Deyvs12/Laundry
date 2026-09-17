@@ -1,7 +1,7 @@
 import * as services from '../services/services.js'
 import { isServiceType, isPriceType } from '../constants.js'
 import { round2 } from '../money.js'
-import { layout } from '../views/layout.js'
+import { render } from '../render.js'
 import { servicesList, renderTbody, renderRow } from '../views/services/list.js'
 import { serviceNewForm, serviceEditRow } from '../views/services/form.js'
 
@@ -38,7 +38,7 @@ export function index(c) {
   const filterType = filterFrom(c.req.query())
   const rows = services.list({ type: filterType || null })
   const body = servicesList(rows, { filterType })
-  return c.html(layout({ title: 'Servicios — Laundry', body, user: c.get('user') }))
+  return render(c, { title: 'Servicios — Laundry', body })
 }
 
 // Fragmento del tbody: lo pide el <select> de filtro al cambiar.

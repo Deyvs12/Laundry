@@ -84,6 +84,17 @@ const migrations = [
         rebuildLogs(db)
       }
     }
+  },
+  {
+    version: 2,
+    name: 'Cash_shifts.closed_by',
+    up(db) {
+      // user_id es quien abre. El dueño deja encargado a un empleado y cierra
+      // él por la noche: hay que saber quién hizo cada cosa.
+      if (!hasColumn(db, 'Cash_shifts', 'closed_by')) {
+        db.exec('ALTER TABLE Cash_shifts ADD COLUMN closed_by INTEGER REFERENCES Users(id)')
+      }
+    }
   }
 ]
 

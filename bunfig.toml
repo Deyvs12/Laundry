@@ -1,0 +1,3 @@
+[test]
+# Fija una DB temporal ANTES de que cualquier test importe src/db/database.js.
+preload = ["./test/_setup.js"]

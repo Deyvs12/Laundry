@@ -1,5 +1,6 @@
 import { getCookie } from 'hono/cookie'
 import * as sessions from '../services/sessions.js'
+import * as cashShifts from '../services/cash_shifts.js'
 
 const PUBLIC_PATHS = new Set(['/login', '/auth/login', '/ping'])
 
@@ -24,5 +25,7 @@ export async function requireAuth(c, next) {
   }
 
   c.set('user', session)
+  // Una consulta por petición; el nav muestra si la caja está abierta.
+  c.set('shift', cashShifts.findOpen())
   return next()
 }

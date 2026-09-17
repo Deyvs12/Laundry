@@ -37,7 +37,9 @@ export const schema = `
     actual_cash REAL,
     difference REAL,
     status TEXT CHECK(status IN ('open', 'closed')) DEFAULT 'open',
-    FOREIGN KEY (user_id) REFERENCES Users(id)
+    closed_by INTEGER,
+    FOREIGN KEY (user_id) REFERENCES Users(id),
+    FOREIGN KEY (closed_by) REFERENCES Users(id)
   );
 
   CREATE TABLE IF NOT EXISTS Orders (

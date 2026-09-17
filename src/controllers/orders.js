@@ -1,7 +1,8 @@
 import * as orders from '../services/orders.js'
 import * as clients from '../services/clients.js'
 import * as servicesRepo from '../services/services.js'
-import { layout } from '../views/layout.js'
+import * as cashShifts from '../services/cash_shifts.js'
+import { render } from '../render.js'
 import { escapeHtml } from '../views/_helpers.js'
 import { ordersList, renderTbody as renderOrdersTbody } from '../views/orders/list.js'
 import { orderDetail } from '../views/orders/detail.js'
@@ -77,7 +78,7 @@ function readFilters(query) {
 export function index(c) {
   const filters = readFilters(c.req.query())
   const body = ordersList(orders.list(filters), filters)
-  return c.html(layout({ title: 'Pedidos — Laundry', body, user: c.get('user') }))
+  return render(c, { title: 'Pedidos — Laundry', body })
 }
 
 // Fragmento del tbody: lo piden los filtros al cambiar.
@@ -87,7 +88,7 @@ export function listFragment(c) {
 
 export function newPage(c) {
   const body = orderNewPage(servicesRepo.searchActive())
-  return c.html(layout({ title: 'Nuevo pedido — Laundry', body, user: c.get('user') }))
+  return render(c, { title: 'Nuevo pedido — Laundry', body })
 }
 
 export function searchServices(c) {
@@ -107,8 +108,8 @@ export function show(c) {
   const order = orders.findById(Number(c.req.param('id')))
   if (!order) return c.text('Pedido no encontrado', 404)
 
-  const body = orderDetail(order, orders.linesOf(order.id))
-  return c.html(layout({ title: `Pedido #${order.id} — Laundry`, body, user: c.get('user') }))
+  const body = orderDetail(order, orders.linesOf(order.id), { shift: c.get('shift') })
+  return render(c, { title: `Pedido #${order.id} — Laundry`, body })
 }
 
 /* ---------- ciclo de vida ---------- */
@@ -127,8 +128,9 @@ function withOrder(c, run) {
     error = e.message
   }
 
+  // El turno se vuelve a consultar: un cobro pudo cambiar lo que hay que mostrar.
   const order = orders.findById(id)
-  return c.html(orderDetail(order, orders.linesOf(id), { error }))
+  return c.html(orderDetail(order, orders.linesOf(id), { error, shift: cashShifts.findOpen() }))
 }
 
 export const start = (c) => withOrder(c, (id, userId) => orders.start(id, userId))

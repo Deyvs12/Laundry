@@ -266,8 +266,8 @@ export const pay = db.transaction((orderId, method, userId) => {
   if (!isPaymentMethod(method)) throw new OrderError('Selecciona la forma de pago')
 
   // Se liga al turno abierto para que el corte lo sume. Sin turno, se cobra
-  // igual (no se puede dejar al cliente sin su ropa) pero queda avisado en la
-  // bitácora.
+  // igual (no se puede dejar al cliente sin su ropa): queda con cash_shift_id
+  // NULL, avisado en bitácora, y visible en /cash como "cobro sin turno".
   const shift = cashShifts.findOpen()
 
   db.query(

@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "bun run src/index.js",
-    "css": "bunx @tailwindcss/cli -i ./public/css/main.css -o ./public/css/output.css --watch"
+    "css": "bunx @tailwindcss/cli -i ./public/css/main.css -o ./public/css/output.css --watch",
+    "test": "bun test"
   },
   "peerDependencies": {
     "typescript": "^5"

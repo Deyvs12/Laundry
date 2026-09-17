@@ -1,5 +1,5 @@
 import * as clients from '../services/clients.js'
-import { layout } from '../views/layout.js'
+import { render } from '../render.js'
 import { clientsList, renderTbody, renderRow } from '../views/clients/list.js'
 import { clientNewForm, clientEditRow } from '../views/clients/form.js'
 
@@ -7,7 +7,7 @@ export function index(c) {
   const user = c.get('user')
   const rows = clients.list()
   const body = clientsList(rows)
-  return c.html(layout({ title: 'Clientes — Laundry', body, user }))
+  return render(c, { title: 'Clientes — Laundry', body })
 }
 
 // Devuelve { values, error } — error null si todo está bien.
