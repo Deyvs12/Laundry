@@ -1,6 +1,6 @@
 // Fase 3: máquina de estados, regla 9, cobro, entrega, cancelación, filtros
 import { describe, test, beforeAll, afterAll } from 'bun:test'
-import { db, startServer, stopServer, resetDb, login, client, ok, addService, addClient, createOrder, orderRow, logsOf, lineIds } from './_helpers.js'
+import { db, startServer, stopServer, resetDb, login, client, ok, addService, addClient, createOrder, orderRow, logsOf, lineIds, daysFromNow } from './_helpers.js'
 
 let base, c, cid, cid2, A, B, C
 const st = (id) => orderRow(id).status
@@ -10,8 +10,8 @@ beforeAll(async () => {
   await addService(c, 'Camisa', 'ironing', '15', 'unit')
   cid = await addClient(c, 'Ana López', '555-0001')
   cid2 = await addClient(c, 'Beto Ruiz', '555-0002')
-  A = await createOrder(c, cid, [[1, 2], [2, 3]], { expected_delivery_date: '2026-09-20' })
-  B = await createOrder(c, cid2, [[1, 2], [2, 3]], { expected_delivery_date: '2026-09-15' })
+  A = await createOrder(c, cid, [[1, 2], [2, 3]], { expected_delivery_date: daysFromNow(10) })
+  B = await createOrder(c, cid2, [[1, 2], [2, 3]], { expected_delivery_date: daysFromNow(5) })
   C = await createOrder(c, cid, [[1, 2], [2, 3]])
 })
 afterAll(stopServer)
@@ -91,7 +91,7 @@ describe('entregar y cancelar', () => {
 })
 
 describe('listado con filtros', () => {
-  // A delivered (20/09), B received (15/09), C cancelled (sin fecha)
+  // A delivered (+10d), B received (+5d), C cancelled (sin fecha)
   const has = (html, id) => html.includes(`/orders/${id}"`)
   test('activos por defecto, todos, por estado, por cliente', async () => {
     let html = await (await c.get('/orders')).text()
@@ -109,7 +109,7 @@ describe('listado con filtros', () => {
   })
 
   test('orden: urgente primero, sin fecha al final; histórico por folio', async () => {
-    const D = await createOrder(c, cid, [[1, 1]], { expected_delivery_date: '2026-09-10' })
+    const D = await createOrder(c, cid, [[1, 1]], { expected_delivery_date: daysFromNow(1) })
     const E = await createOrder(c, cid, [[1, 1]])
     let html = await (await c.get('/orders/list')).text()
     const pos = (id) => html.indexOf(`/orders/${id}"`)

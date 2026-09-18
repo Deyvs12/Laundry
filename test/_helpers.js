@@ -21,7 +21,7 @@ export function stopServer() {
 // Los archivos de test comparten proceso y DB: cada uno arranca limpio.
 export function resetDb() {
   db.exec('PRAGMA foreign_keys = OFF')
-  for (const t of ['Logs', 'Order_services', 'Orders', 'Cash_shifts', 'Services', 'Clients', 'Users']) {
+  for (const t of ['Logs', 'Order_services', 'Orders', 'Cash_shifts', 'Services', 'Clients', 'Staff', 'Users']) {
     db.exec(`DELETE FROM ${t}`)
   }
   db.exec('DELETE FROM sqlite_sequence')
@@ -65,9 +65,15 @@ export async function addClient(c, name, phone = '') {
   return Number((await r.text()).match(/name="id_client" value="(\d+)"/)[1])
 }
 
-// lines: [[serviceId, qty], ...]
+export function ensureStaff(name = 'Personal Prueba') {
+  const row = db.query('SELECT id FROM Staff WHERE name = ?').get(name)
+  return row ? row.id : db.query('INSERT INTO Staff (name) VALUES (?)').run(name).lastInsertRowid
+}
+
+// lines: [[serviceId, qty], ...]. Si no se indica id_staff, usa una persona de prueba.
 export async function createOrder(c, clientId, lines, extra = {}) {
   const params = new URLSearchParams()
+  if (extra.id_staff === undefined) params.set('id_staff', String(ensureStaff()))
   for (const [id, qty] of lines) {
     params.append('line_service_id[]', String(id))
     params.append('line_quantity[]', String(qty))
@@ -78,6 +84,14 @@ export async function createOrder(c, clientId, lines, extra = {}) {
   const loc = r.headers.get('hx-redirect')
   if (!loc) throw new Error(`createOrder rechazado: ${await r.text()}`)
   return Number(loc.split('/').pop())
+}
+
+// 'YYYY-MM-DD' local a n días de hoy (negativo = pasado)
+export function daysFromNow(n) {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  const pad = (x) => String(x).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 export const orderRow = (id) => db.query('SELECT * FROM Orders WHERE id = ?').get(id)

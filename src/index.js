@@ -11,6 +11,8 @@ import clientsRoutes from './routes/clients.js'
 import servicesRoutes from './routes/services.js'
 import ordersRoutes from './routes/orders.js'
 import cashRoutes from './routes/cash_shifts.js'
+import staffRoutes from './routes/staff.js'
+import reportsRoutes from './routes/reports.js'
 
 await seedAdmin()
 
@@ -27,6 +29,8 @@ app.route('/', clientsRoutes)
 app.route('/', servicesRoutes)
 app.route('/', ordersRoutes)
 app.route('/', cashRoutes)
+app.route('/', staffRoutes)
+app.route('/', reportsRoutes)
 
 app.get('/', (c) => {
   const user = c.get('user')

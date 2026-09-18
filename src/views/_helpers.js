@@ -37,6 +37,14 @@ export function formatDate(s) {
   })
 }
 
+// Hoy en la zona local de la PC, como 'YYYY-MM-DD'. Sirve para el atributo
+// min del <input type="date"> y para validar en el servidor.
+export function todayLocal() {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 export function formatDateTime(s) {
   if (!s) return '—'
   return toLocal(s).toLocaleString('es-MX', {

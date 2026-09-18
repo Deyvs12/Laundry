@@ -56,6 +56,7 @@ export function ordersList(orders, { status = 'active', client = '' } = {}) {
           <th class="border border-slate-300 px-3 py-2 w-28">Estado</th>
           <th class="border border-slate-300 px-3 py-2 w-28">Total</th>
           <th class="border border-slate-300 px-3 py-2 w-24">Pago</th>
+          <th class="border border-slate-300 px-3 py-2 w-32">Atendió</th>
         </tr>
       </thead>
       ${renderTbody(orders)}
@@ -66,7 +67,7 @@ export function ordersList(orders, { status = 'active', client = '' } = {}) {
 export function renderTbody(orders) {
   if (orders.length === 0) {
     return `<tbody id="orders-tbody">
-      <tr><td colspan="7" class="border border-slate-300 px-3 py-3 text-center text-slate-500">No hay pedidos con ese filtro.</td></tr>
+      <tr><td colspan="8" class="border border-slate-300 px-3 py-3 text-center text-slate-500">No hay pedidos con ese filtro.</td></tr>
     </tbody>`
   }
   return `<tbody id="orders-tbody">${orders.map(renderRow).join('')}</tbody>`
@@ -85,6 +86,7 @@ function renderRow(order) {
       <td class="border border-slate-300 px-3 py-2">${escapeHtml(orderStatusLabel(order.status))}</td>
       <td class="border border-slate-300 px-3 py-2">${formatMoney(order.total)}</td>
       <td class="border border-slate-300 px-3 py-2">${order.paid ? 'Pagado' : 'Pendiente'}</td>
+      <td class="border border-slate-300 px-3 py-2">${escapeHtml(order.staff_name || '—')}</td>
     </tr>
   `
 }

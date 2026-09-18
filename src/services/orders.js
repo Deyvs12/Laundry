@@ -50,15 +50,15 @@ export function totalsFor(lines, discount = 0) {
 // Pedido + líneas + bitácora en una sola transacción: o queda todo, o no queda
 // nada. Un pedido a medias (cabecera sin líneas) sería imposible de cuadrar.
 const insertOrder = db.transaction(
-  ({ idClient, idUser, lines, discount, notes, expectedDelivery }) => {
+  ({ idClient, idUser, idStaff, staffName, lines, discount, notes, expectedDelivery }) => {
     const { subtotal, total } = totalsFor(lines, discount)
 
     const { lastInsertRowid: orderId } = db
       .query(
-        `INSERT INTO Orders (id_client, id_user, discount, total, notes, expected_delivery_date)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO Orders (id_client, id_user, id_staff, discount, total, notes, expected_delivery_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(idClient, idUser, discount, total, notes || null, expectedDelivery || null)
+      .run(idClient, idUser, idStaff, discount, total, notes || null, expectedDelivery || null)
 
     const insertLine = db.query(
       `INSERT INTO Order_services (id_orders, id_services, quantity, unit_price, sub_total)
@@ -72,7 +72,7 @@ const insertOrder = db.transaction(
       userId: idUser,
       orderId,
       action: 'ORDER_CREATED',
-      message: `Pedido #${orderId} creado con ${lines.length} servicio(s) por un total de ${total.toFixed(2)}`
+      message: `Pedido #${orderId} creado por ${staffName} con ${lines.length} servicio(s) por un total de ${total.toFixed(2)}`
     })
 
     // El descuento se registra aparte: es justo lo que el dueño va a querer
@@ -98,7 +98,7 @@ const LIST_COLUMNS = `
   o.id, o.status, o.total, o.discount, o.paid, o.payment_method, o.payment_day,
   o.cash_shift_id, o.created_at, o.expected_delivery_date,
   c.name AS client_name, c.phone AS client_phone,
-  u.name AS user_name`
+  u.name AS user_name, st.name AS staff_name`
 
 export const ACTIVE_STATUSES = ['received', 'in_process', 'ready']
 
@@ -136,6 +136,7 @@ export function list({ status = 'active', client = '', limit = 200 } = {}) {
        FROM Orders o
        JOIN Clients c ON c.id = o.id_client
        JOIN Users u ON u.id = o.id_user
+       LEFT JOIN Staff st ON st.id = o.id_staff
        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
        ORDER BY ${order}
        LIMIT ?`
@@ -150,6 +151,7 @@ export function findById(id) {
        FROM Orders o
        JOIN Clients c ON c.id = o.id_client
        JOIN Users u ON u.id = o.id_user
+       LEFT JOIN Staff st ON st.id = o.id_staff
        WHERE o.id = ?`
     )
     .get(id)

@@ -30,7 +30,7 @@ describe('sin turno', () => {
     ok(orderRow(oCash).paid === 1 && orderRow(oCash).cash_shift_id === null, 'EFECTIVO sin turno permitido')
     ok(db.query(`SELECT message FROM Logs WHERE order_id = ? AND action = 'ORDER_PAID'`).get(oCash).message.includes('SIN turno'), 'log marcado')
     html = await (await A.get('/cash')).text()
-    ok(html.includes('Cobros sin turno'), 'sección visible')
+    ok(html.includes('Cobros sin turno de hoy'), 'sección visible')
     ok(html.includes('Efectivo: <strong>$40.00</strong> (1)') && html.includes('Transferencias: <strong>$120.00</strong> (1)'), 'totales sin turno')
     ok(html.includes(`/orders/${oCash}"`) && html.includes(`/orders/${o4}"`), 'lista ambos')
   })
@@ -92,6 +92,18 @@ describe('cerrar', () => {
     await A.post(`/orders/${o}/pay`, { payment_method: 'cash' })
     ok(orderRow(o).paid === 1 && orderRow(o).cash_shift_id === null, 'sin turno')
     ok((await (await A.get('/cash')).text()).includes('Efectivo: <strong>$80.00</strong> (2)'), 'suma con el anterior')
+  })
+
+  test('los cobros sin turno de días anteriores dejan de mostrarse (sin borrarse)', async () => {
+    const o = await newOrder(1)
+    await A.post(`/orders/${o}/pay`, { payment_method: 'cash' })
+    let html = await (await A.get('/cash')).text()
+    ok(html.includes('Efectivo: <strong>$120.00</strong> (3)'), 'hoy cuenta')
+    db.query(`UPDATE Orders SET payment_day = datetime('now', '-1 day') WHERE id = ?`).run(o)
+    html = await (await A.get('/cash')).text()
+    ok(html.includes('Efectivo: <strong>$80.00</strong> (2)') && !html.includes(`/orders/${o}"`), 'el de ayer ya no aparece')
+    ok(orderRow(o).paid === 1, 'pero sigue pagado en la DB')
+    db.query(`UPDATE Orders SET payment_day = datetime('now', '-3 hours') WHERE id IN (SELECT id FROM Orders WHERE paid = 1 AND cash_shift_id IS NULL)`).run()
   })
 
   test('cuadra, sobra, fondo cero, abierto no está en histórico', async () => {

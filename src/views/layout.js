@@ -27,6 +27,8 @@ function renderNav(user, shift) {
         <a href="/orders" class="text-sm text-slate-600 hover:text-slate-900">Pedidos</a>
         <a href="/clients" class="text-sm text-slate-600 hover:text-slate-900">Clientes</a>
         <a href="/services" class="text-sm text-slate-600 hover:text-slate-900">Servicios</a>
+        <a href="/staff" class="text-sm text-slate-600 hover:text-slate-900">Personal</a>
+        <a href="/reports" class="text-sm text-slate-600 hover:text-slate-900">Reportes</a>
         <a href="/cash" class="text-sm text-slate-600 hover:text-slate-900">Caja
           <span class="ml-1 px-2 py-0.5 rounded text-xs ${shift ? 'bg-green-100 text-green-800' : 'bg-slate-200 text-slate-600'}">${shift ? `abierta #${shift.id}` : 'cerrada'}</span>
         </a>

@@ -1,6 +1,6 @@
 // Fase 2: creación de pedidos
 import { describe, test, beforeAll, afterAll } from 'bun:test'
-import { db, startServer, stopServer, resetDb, login, client, ok, addService, addClient, createOrder, orderRow, logsOf } from './_helpers.js'
+import { db, startServer, stopServer, resetDb, login, client, ok, addService, addClient, createOrder, orderRow, logsOf, ensureStaff, daysFromNow } from './_helpers.js'
 
 let base, c, cid
 const S = {}
@@ -20,6 +20,7 @@ describe('pantalla de captura', () => {
     ok(html.includes('name="service_search"') && html.includes('name="service_type"'), 'buscador')
     ok(html.includes('$25.50'), 'precio visible en resultados')
     ok(html.includes('Ningún cliente seleccionado') && html.includes('Aún no has agregado servicios'), 'estado inicial')
+    ok(html.includes(`type="date" min="${daysFromNow(0)}"`), 'el input de fecha tiene min=hoy')
   })
 
   test('cliente: buscar, seleccionar, quitar, crear al vuelo', async () => {
@@ -74,13 +75,15 @@ describe('pantalla de captura', () => {
 describe('alta del pedido', () => {
   test('validaciones', async () => {
     const lines = [['line_service_id[]', S.kilo], ['line_quantity[]', '2.5']]
-    const txt = async (params) => (await c.post('/orders', new URLSearchParams(params))).text()
+    const txt = async (params) => (await c.post('/orders', new URLSearchParams([...params, ['id_staff', String(ensureStaff())]]))).text()
     ok((await txt([...lines, ['id_client', '']])).includes('Selecciona un cliente'), 'sin cliente')
     ok((await txt([['id_client', cid]])).includes('al menos un servicio'), 'sin líneas')
     ok((await txt([...lines, ['id_client', cid], ['discount', '9999']])).includes('no puede ser mayor'), 'descuento excesivo')
     ok((await txt([...lines, ['id_client', cid], ['expected_delivery_date', '13-99-2026']])).includes('fecha de entrega no es válida'), 'formato de fecha')
     ok((await txt([...lines, ['id_client', cid], ['expected_delivery_date', '2026-02-31']])).includes('fecha de entrega no es válida'), '31 de febrero')
     ok((await txt([...lines, ['id_client', cid], ['expected_delivery_date', '2026-13-01']])).includes('fecha de entrega no es válida'), 'mes 13')
+    ok((await txt([...lines, ['id_client', cid], ['expected_delivery_date', daysFromNow(-1)]])).includes('no puede ser anterior a hoy'), 'ayer rechazado')
+    ok((await txt([...lines, ['id_client', cid], ['expected_delivery_date', '2020-01-01']])).includes('no puede ser anterior a hoy'), 'pasado lejano rechazado')
   })
 
   test('alta correcta: totales, snapshot de precio, bitácora', async () => {
@@ -100,15 +103,20 @@ describe('alta del pedido', () => {
     ok((await (await c.get('/orders?status=all')).text()).includes('29/02/2028'), 'fecha local en listado')
   })
 
+  test('hoy se acepta como fecha de entrega', async () => {
+    const id = await createOrder(c, cid, [[S.kilo, 1]], { expected_delivery_date: daysFromNow(0) })
+    ok(orderRow(id).expected_delivery_date === daysFromNow(0), 'hoy')
+  })
+
   test('el precio no se acepta del navegador', async () => {
-    const r = await c.post('/orders', new URLSearchParams([['line_service_id[]', S.kilo], ['line_quantity[]', '1'], ['line_unit_price[]', '0.01'], ['id_client', cid]]))
+    const r = await c.post('/orders', new URLSearchParams([['line_service_id[]', S.kilo], ['line_quantity[]', '1'], ['line_unit_price[]', '0.01'], ['id_client', cid], ['id_staff', String(ensureStaff())]]))
     const id = Number(r.headers.get('hx-redirect').split('/').pop())
     ok(db.query('SELECT unit_price FROM Order_services WHERE id_orders = ?').get(id).unit_price === 25.5, 'precio manipulado ignorado')
   })
 
   test('servicio desactivado a media captura', async () => {
     await c.post(`/services/${S.camisa}/toggle`)
-    const r = await c.post('/orders', new URLSearchParams([['line_service_id[]', S.camisa], ['line_quantity[]', '1'], ['id_client', cid]]))
+    const r = await c.post('/orders', new URLSearchParams([['line_service_id[]', S.camisa], ['line_quantity[]', '1'], ['id_client', cid], ['id_staff', String(ensureStaff())]]))
     ok((await r.text()).includes('dejó de estar disponible'), 'avisa')
     await c.post(`/services/${S.camisa}/toggle`)
   })

@@ -54,10 +54,10 @@ export function paymentsOf(shiftId) {
   return db
     .query(
       `SELECT o.id, o.total, o.payment_method, o.payment_day, o.status,
-              c.name AS client_name, u.name AS user_name
+              c.name AS client_name, st.name AS staff_name
        FROM Orders o
        JOIN Clients c ON c.id = o.id_client
-       JOIN Users u ON u.id = o.id_user
+       LEFT JOIN Staff st ON st.id = o.id_staff
        WHERE o.cash_shift_id = ? AND o.paid = 1
        ORDER BY o.payment_day, o.id`
     )
@@ -65,16 +65,21 @@ export function paymentsOf(shiftId) {
 }
 
 // Cobros registrados sin turno abierto. No entran en ningún corte, así que se
-// muestran aparte para que no pasen desapercibidos.
+// muestran aparte para que no pasen desapercibidos. Solo los de HOY: no se
+// borra nada, pero la sección no debe crecer sin límite. Los anteriores siguen
+// en el listado de pedidos.
+const TODAY_UNASSIGNED = `o.paid = 1 AND o.cash_shift_id IS NULL
+       AND date(o.payment_day, 'localtime') = date('now', 'localtime')`
+
 export function unassignedPayments() {
   return db
     .query(
       `SELECT o.id, o.total, o.payment_method, o.payment_day, o.status,
-              c.name AS client_name, u.name AS user_name
+              c.name AS client_name, st.name AS staff_name
        FROM Orders o
        JOIN Clients c ON c.id = o.id_client
-       JOIN Users u ON u.id = o.id_user
-       WHERE o.paid = 1 AND o.cash_shift_id IS NULL
+       LEFT JOIN Staff st ON st.id = o.id_staff
+       WHERE ${TODAY_UNASSIGNED}
        ORDER BY o.payment_day DESC, o.id DESC`
     )
     .all()
@@ -88,8 +93,8 @@ export function unassignedSummary() {
          COALESCE(SUM(payment_method = 'cash'), 0)                              AS cash_count,
          COALESCE(SUM(CASE WHEN payment_method = 'transfer' THEN total END), 0) AS transfer_total,
          COALESCE(SUM(payment_method = 'transfer'), 0)                          AS transfer_count
-       FROM Orders
-       WHERE paid = 1 AND cash_shift_id IS NULL`
+       FROM Orders o
+       WHERE ${TODAY_UNASSIGNED}`
     )
     .get()
   return {

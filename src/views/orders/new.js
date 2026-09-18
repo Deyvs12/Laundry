@@ -1,4 +1,4 @@
-import { escapeHtml, formatMoney, renderOptions } from '../_helpers.js'
+import { escapeHtml, formatMoney, renderOptions, todayLocal } from '../_helpers.js'
 import {
   SERVICE_TYPES,
   quantityUnit,
@@ -10,7 +10,7 @@ import {
 // guardar recoge igual todos los campos, y a cambio evitamos dos problemas:
 // formularios anidados (el alta de cliente al vuelo vive aquí dentro) y envíos
 // accidentales al pulsar Enter en el mostrador.
-export function orderNewPage(initialServices) {
+export function orderNewPage(initialServices, staff) {
   return `
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-semibold">Nuevo pedido</h1>
@@ -102,7 +102,7 @@ export function orderNewPage(initialServices) {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="block text-sm font-medium mb-1" for="expected">Entrega estimada</label>
-            <input id="expected" name="expected_delivery_date" type="date"
+            <input id="expected" name="expected_delivery_date" type="date" min="${todayLocal()}"
               class="border border-slate-300 rounded px-3 py-2">
           </div>
           <div>
@@ -111,6 +111,11 @@ export function orderNewPage(initialServices) {
               class="w-full border border-slate-300 rounded px-3 py-2">
           </div>
         </div>
+      </section>
+
+      <section class="border border-slate-300 rounded p-4">
+        <h2 class="font-semibold mb-3">5. ¿Quién atendió?</h2>
+        ${staffPicker(staff)}
       </section>
 
     </div>
@@ -124,6 +129,23 @@ export function orderNewPage(initialServices) {
         class="bg-slate-800 text-white px-4 py-2 rounded">Crear pedido</button>
       <div id="order-error" class="text-sm text-red-600"></div>
     </div>
+  `
+}
+
+// Un solo usuario inicia sesión, así que la persona que atendió se elige aquí.
+// Sin valor por defecto a propósito: una atribución equivocada es peor que un
+// clic más.
+function staffPicker(staff) {
+  if (staff.length === 0) {
+    return `<p class="text-sm text-red-600">
+      No hay personal registrado.
+      <a href="/staff" class="underline">Da de alta a las personas que atienden</a> antes de registrar pedidos.
+    </p>`
+  }
+  return `
+    <select name="id_staff" required class="border border-slate-300 rounded px-3 py-2 w-full md:w-72">
+      ${renderOptions(staff.map((p) => ({ value: String(p.id), label: p.name })), '', 'Selecciona una persona…')}
+    </select>
   `
 }
 

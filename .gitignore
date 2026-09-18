@@ -40,3 +40,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Tailwind (Archivos generados)
 public/css/output.css
+
+# Respaldos de la base de datos
+backups/

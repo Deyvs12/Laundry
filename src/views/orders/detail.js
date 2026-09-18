@@ -30,7 +30,7 @@ export function orderDetail(order, lines, { error = null, shift = null } = {}) {
 
     <div class="border border-slate-300 rounded p-4 mb-4 text-sm grid grid-cols-1 md:grid-cols-2 gap-2">
       ${field('Cliente', escapeHtml(order.client_name) + (order.client_phone ? ` · ${escapeHtml(order.client_phone)}` : ''))}
-      ${field('Atendió', escapeHtml(order.user_name))}
+      ${field('Atendió', escapeHtml(order.staff_name || '—'))}
       ${field('Recibido', formatDateTime(order.created_at))}
       ${field('Entrega estimada', formatDate(order.expected_delivery_date))}
       ${field('Pago', paymentSummary(order))}

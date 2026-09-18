@@ -95,6 +95,24 @@ const migrations = [
         db.exec('ALTER TABLE Cash_shifts ADD COLUMN closed_by INTEGER REFERENCES Users(id)')
       }
     }
+  },
+  {
+    version: 3,
+    name: 'Staff y Orders.id_staff',
+    up(db) {
+      // Un solo usuario inicia sesión; quién atendió cada pedido se elige de
+      // una lista de personas que no tienen contraseña ni sesión.
+      db.exec(`CREATE TABLE IF NOT EXISTS Staff (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`)
+      // Nullable: los pedidos anteriores a esta versión no tienen persona.
+      if (!hasColumn(db, 'Orders', 'id_staff')) {
+        db.exec('ALTER TABLE Orders ADD COLUMN id_staff INTEGER REFERENCES Staff(id)')
+      }
+    }
   }
 ]
 

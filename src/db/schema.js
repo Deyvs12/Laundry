@@ -27,6 +27,13 @@ export const schema = `
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
+  CREATE TABLE IF NOT EXISTS Staff (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE TABLE IF NOT EXISTS Cash_shifts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -46,6 +53,7 @@ export const schema = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     id_client INTEGER NOT NULL,
     id_user INTEGER NOT NULL,
+    id_staff INTEGER,
     status TEXT CHECK(status IN ('received', 'in_process', 'ready', 'delivered', 'cancelled')) DEFAULT 'received',
     discount REAL DEFAULT 0,
     total REAL DEFAULT 0,
@@ -58,6 +66,7 @@ export const schema = `
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_client) REFERENCES Clients(id),
     FOREIGN KEY (id_user) REFERENCES Users(id),
+    FOREIGN KEY (id_staff) REFERENCES Staff(id),
     FOREIGN KEY (cash_shift_id) REFERENCES Cash_shifts(id)
   );
 

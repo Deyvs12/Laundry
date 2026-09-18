@@ -4,4 +4,6 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-process.env.LAVANDERIA_DB = join(mkdtempSync(join(tmpdir(), 'lavanderia-test-')), 'test.db')
+const dir = mkdtempSync(join(tmpdir(), 'lavanderia-test-'))
+process.env.LAVANDERIA_DB = join(dir, 'test.db')
+process.env.LAVANDERIA_BACKUPS = join(dir, 'backups')

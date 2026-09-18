@@ -2,8 +2,9 @@ import * as orders from '../services/orders.js'
 import * as clients from '../services/clients.js'
 import * as servicesRepo from '../services/services.js'
 import * as cashShifts from '../services/cash_shifts.js'
+import * as staffRepo from '../services/staff.js'
 import { render } from '../render.js'
-import { escapeHtml } from '../views/_helpers.js'
+import { escapeHtml, todayLocal } from '../views/_helpers.js'
 import { ordersList, renderTbody as renderOrdersTbody } from '../views/orders/list.js'
 import { orderDetail } from '../views/orders/detail.js'
 import { isServiceType, quantityUnit, isOrderStatus } from '../constants.js'
@@ -87,7 +88,7 @@ export function listFragment(c) {
 }
 
 export function newPage(c) {
-  const body = orderNewPage(servicesRepo.searchActive())
+  const body = orderNewPage(servicesRepo.searchActive(), staffRepo.listActive())
   return render(c, { title: 'Nuevo pedido — Laundry', body })
 }
 
@@ -259,11 +260,21 @@ export async function create(c) {
   if (expectedDelivery && !isValidDate(expectedDelivery)) {
     return c.html('La fecha de entrega no es válida')
   }
+  // Comparación de strings 'YYYY-MM-DD': funciona porque el formato es fijo.
+  if (expectedDelivery && expectedDelivery < todayLocal()) {
+    return c.html('La fecha de entrega no puede ser anterior a hoy')
+  }
+
+  const idStaff = Number(body.id_staff)
+  const staff = Number.isInteger(idStaff) ? staffRepo.findById(idStaff) : null
+  if (!staff || staff.is_active !== 1) return c.html('Selecciona quién atendió el pedido')
 
   // user viene de la sesión, donde el id se llama userId (no id).
   const orderId = orders.create({
     idClient,
     idUser: user.userId,
+    idStaff,
+    staffName: staff.name,
     lines,
     discount,
     notes: (body.notes || '').toString().trim(),

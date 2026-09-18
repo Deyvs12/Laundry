@@ -74,9 +74,9 @@ function unassignedPanel(payments, summary) {
   if (payments.length === 0) return ''
   return `
     <div class="border border-amber-300 bg-amber-50 rounded p-4 mt-6">
-      <h2 class="font-semibold mb-1">Cobros sin turno</h2>
+      <h2 class="font-semibold mb-1">Cobros sin turno de hoy</h2>
       <p class="text-sm text-slate-600 mb-3">
-        Se registraron con la caja cerrada y no aparecen en ningún corte.
+        Se registraron hoy con la caja cerrada y no aparecen en ningún corte. Mañana esta lista arranca vacía; los anteriores siguen en Pedidos.
         Efectivo: <strong>${formatMoney(summary.cash_total)}</strong> (${summary.cash_count}) ·
         Transferencias: <strong>${formatMoney(summary.transfer_total)}</strong> (${summary.transfer_count})
       </p>
