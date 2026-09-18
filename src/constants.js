@@ -52,3 +52,17 @@ export const quantityUnit = (priceType) =>
 
 export const isOrderStatus = (v) => ORDER_STATUSES.some((o) => o.value === v)
 export const isPaymentMethod = (v) => PAYMENT_METHODS.some((o) => o.value === v)
+
+export const LOG_ACTIONS = [
+  { value: 'ORDER_CREATED', label: 'Pedido creado' },
+  { value: 'ORDER_STATUS_CHANGED', label: 'Cambio de estado' },
+  { value: 'ORDER_DISCOUNTED', label: 'Descuento' },
+  { value: 'ORDER_PAID', label: 'Cobro' },
+  { value: 'ORDER_CANCELLED', label: 'Pedido cancelado' },
+  { value: 'SHIFT_OPENED', label: 'Caja abierta' },
+  { value: 'SHIFT_CLOSED', label: 'Caja cerrada' },
+  { value: 'USER_LOGIN', label: 'Inicio de sesión' },
+  { value: 'USER_LOGOUT', label: 'Cierre de sesión' }
+]
+export const isLogAction = (v) => LOG_ACTIONS.some((o) => o.value === v)
+export const logActionLabel = (v) => labelOf(LOG_ACTIONS, v)

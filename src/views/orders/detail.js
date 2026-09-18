@@ -23,7 +23,10 @@ export function orderDetail(order, lines, { error = null, shift = null } = {}) {
       <h1 class="text-2xl font-semibold">Pedido #${order.id}
         <span class="text-base font-normal text-slate-500">· ${escapeHtml(orderStatusLabel(order.status))}</span>
       </h1>
-      <a href="/orders" class="text-sm text-slate-600 hover:text-slate-900">Volver a pedidos</a>
+      <div class="flex gap-4 text-sm">
+        <a href="/logs?order=${order.id}" class="text-slate-600 hover:text-slate-900">Bitácora</a>
+        <a href="/orders" class="text-slate-600 hover:text-slate-900">Volver a pedidos</a>
+      </div>
     </div>
 
     ${error ? `<p class="mb-4 text-sm text-red-600 border border-red-200 bg-red-50 rounded px-3 py-2">${escapeHtml(error)}</p>` : ''}
