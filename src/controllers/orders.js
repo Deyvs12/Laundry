@@ -5,7 +5,7 @@ import * as cashShifts from '../services/cash_shifts.js'
 import * as staffRepo from '../services/staff.js'
 import { render } from '../render.js'
 import { escapeHtml, todayLocal } from '../views/_helpers.js'
-import { ordersList, renderTbody as renderOrdersTbody } from '../views/orders/list.js'
+import { ordersList, renderResults as renderOrdersResults } from '../views/orders/list.js'
 import { orderDetail } from '../views/orders/detail.js'
 import { isServiceType, quantityUnit, isOrderStatus } from '../constants.js'
 import { round2 } from '../money.js'
@@ -70,9 +70,11 @@ function summaryOob(lines, discount) {
 
 function readFilters(query) {
   const status = (query.status || 'active').toString()
+  const page = Number(query.page)
   return {
     status: status === 'all' || isOrderStatus(status) ? status : 'active',
-    client: (query.client || '').toString().trim()
+    client: (query.client || '').toString().trim(),
+    page: Number.isInteger(page) && page > 0 ? page : 1
   }
 }
 
@@ -82,9 +84,10 @@ export function index(c) {
   return render(c, { title: 'Pedidos — Laundry', body })
 }
 
-// Fragmento del tbody: lo piden los filtros al cambiar.
+// Fragmento (tabla + paginador): lo piden los filtros y el paginador.
 export function listFragment(c) {
-  return c.html(renderOrdersTbody(orders.list(readFilters(c.req.query()))))
+  const filters = readFilters(c.req.query())
+  return c.html(renderOrdersResults(orders.list(filters), filters))
 }
 
 export function newPage(c) {
@@ -230,57 +233,106 @@ export async function refreshSummary(c) {
   return c.html(orderSummary({ ...totals, warning }))
 }
 
-/* ---------- alta ---------- */
+/* ---------- alta y edición ---------- */
 
-export async function create(c) {
-  const body = await c.req.parseBody({ all: true })
-  const user = c.get('user')
-
+// Valida y arma los datos de un pedido a partir del formulario. Devuelve
+// { error } o { data }. keepDate: fecha que se permite conservar aunque sea
+// pasada (la que ya tenía el pedido al editarlo).
+function readOrderInput(body, { keepDate = null } = {}) {
   const idClient = Number(body.id_client)
   const client = Number.isInteger(idClient) ? clients.findById(idClient) : null
-  if (!client) return c.html('Selecciona un cliente antes de crear el pedido')
+  if (!client) return { error: 'Selecciona un cliente antes de guardar el pedido' }
 
   const rawLines = readLines(body)
-  if (rawLines.length === 0) return c.html('Agrega al menos un servicio al pedido')
+  if (rawLines.length === 0) return { error: 'Agrega al menos un servicio al pedido' }
 
   const lines = orders.buildLines(rawLines)
   // buildLines descarta lo que ya no existe o fue desactivado mientras se
   // capturaba. Si la cuenta no cuadra, avisamos en vez de cobrar de menos.
   if (lines.length !== rawLines.length) {
-    return c.html('Alguno de los servicios dejó de estar disponible. Revisa las líneas del pedido.')
+    return { error: 'Alguno de los servicios dejó de estar disponible. Revisa las líneas del pedido.' }
   }
 
   const discount = readDiscount(body)
   const { subtotal } = orders.totalsFor(lines, discount)
-  if (discount > subtotal) {
-    return c.html('El descuento no puede ser mayor que el subtotal')
-  }
+  if (discount > subtotal) return { error: 'El descuento no puede ser mayor que el subtotal' }
 
   const expectedDelivery = (body.expected_delivery_date || '').toString().trim()
-  if (expectedDelivery && !isValidDate(expectedDelivery)) {
-    return c.html('La fecha de entrega no es válida')
-  }
+  if (expectedDelivery && !isValidDate(expectedDelivery)) return { error: 'La fecha de entrega no es válida' }
   // Comparación de strings 'YYYY-MM-DD': funciona porque el formato es fijo.
-  if (expectedDelivery && expectedDelivery < todayLocal()) {
-    return c.html('La fecha de entrega no puede ser anterior a hoy')
+  if (expectedDelivery && expectedDelivery < todayLocal() && expectedDelivery !== keepDate) {
+    return { error: 'La fecha de entrega no puede ser anterior a hoy' }
   }
 
   const idStaff = Number(body.id_staff)
   const staff = Number.isInteger(idStaff) ? staffRepo.findById(idStaff) : null
-  if (!staff || staff.is_active !== 1) return c.html('Selecciona quién atendió el pedido')
+  if (!staff || staff.is_active !== 1) return { error: 'Selecciona quién atendió el pedido' }
+
+  return {
+    data: {
+      idClient,
+      idStaff,
+      staffName: staff.name,
+      lines,
+      discount,
+      notes: (body.notes || '').toString().trim(),
+      expectedDelivery
+    }
+  }
+}
+
+export async function create(c) {
+  const body = await c.req.parseBody({ all: true })
+  const { error, data } = readOrderInput(body)
+  if (error) return c.html(error)
 
   // user viene de la sesión, donde el id se llama userId (no id).
-  const orderId = orders.create({
-    idClient,
-    idUser: user.userId,
-    idStaff,
-    staffName: staff.name,
-    lines,
-    discount,
-    notes: (body.notes || '').toString().trim(),
-    expectedDelivery
-  })
+  const orderId = orders.create({ ...data, idUser: c.get('user').userId })
 
   c.header('HX-Redirect', `/orders/${orderId}`)
+  return c.body(null, 200)
+}
+
+export function editPage(c) {
+  const id = Number(c.req.param('id'))
+  const order = orders.findById(id)
+  if (!order) return c.text('Pedido no encontrado', 404)
+  if (!orders.isEditable(order)) {
+    const body = orderDetail(order, orders.linesOf(id), { error: 'Solo se puede editar un pedido recibido y sin cobrar', shift: c.get('shift') })
+    return render(c, { title: `Pedido #${id} — Laundry`, body })
+  }
+
+  // Las líneas guardadas se convierten al formato de captura, con el precio
+  // que ya tenían: editar no debe repreciar lo capturado sin que se vea.
+  const lines = orders.linesOf(id).map((l) => ({
+    id_services: l.id_services,
+    name: l.name,
+    price_type: l.price_type,
+    quantity: l.quantity,
+    unit_price: l.unit_price,
+    sub_total: l.sub_total
+  }))
+  const client = clients.findById(order.id_client)
+  const body = orderNewPage(servicesRepo.searchActive(), staffRepo.listActive(), { order, lines, client })
+  return render(c, { title: `Editar pedido #${id} — Laundry`, body })
+}
+
+export async function update(c) {
+  const id = Number(c.req.param('id'))
+  const order = orders.findById(id)
+  if (!order) return c.text('Pedido no encontrado', 404)
+
+  const body = await c.req.parseBody({ all: true })
+  const { error, data } = readOrderInput(body, { keepDate: order.expected_delivery_date })
+  if (error) return c.html(error)
+
+  try {
+    orders.update(id, data, c.get('user').userId)
+  } catch (e) {
+    if (!(e instanceof orders.OrderError)) throw e
+    return c.html(e.message)
+  }
+
+  c.header('HX-Redirect', `/orders/${id}`)
   return c.body(null, 200)
 }

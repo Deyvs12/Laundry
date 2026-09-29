@@ -1,4 +1,4 @@
-import { escapeHtml, formatMoney, formatDate, renderOptions } from '../_helpers.js'
+import { escapeHtml, formatMoney, formatDate, renderOptions, renderPager } from '../_helpers.js'
 import { ORDER_STATUSES, orderStatusLabel } from '../../constants.js'
 
 const STATUS_FILTERS = [
@@ -7,7 +7,8 @@ const STATUS_FILTERS = [
   ...ORDER_STATUSES
 ]
 
-export function ordersList(orders, { status = 'active', client = '' } = {}) {
+export function ordersList(result, filters) {
+  const { status = 'active', client = '' } = filters
   return `
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-semibold">Pedidos</h1>
@@ -22,7 +23,7 @@ export function ordersList(orders, { status = 'active', client = '' } = {}) {
           name="status"
           hx-get="/orders/list"
           hx-include="#orders-filters"
-          hx-target="#orders-tbody"
+          hx-target="#orders-results"
           hx-swap="outerHTML"
           class="border border-slate-300 rounded px-3 py-2 text-sm">
           ${renderOptions(STATUS_FILTERS, status)}
@@ -40,12 +41,20 @@ export function ordersList(orders, { status = 'active', client = '' } = {}) {
           hx-get="/orders/list"
           hx-include="#orders-filters"
           hx-trigger="input changed delay:300ms"
-          hx-target="#orders-tbody"
+          hx-target="#orders-results"
           hx-swap="outerHTML"
           class="w-full border border-slate-300 rounded px-3 py-2 text-sm">
       </div>
     </div>
 
+    ${renderResults(result, filters)}
+  `
+}
+
+// Tabla + paginador: lo que se reemplaza al filtrar o cambiar de página.
+export function renderResults(result, filters) {
+  const href = (p) => `/orders/list?${new URLSearchParams({ status: filters.status, client: filters.client, page: String(p) })}`
+  return `<div id="orders-results">
     <table class="w-full border border-slate-300 text-sm">
       <thead class="bg-slate-100 text-left">
         <tr>
@@ -59,9 +68,10 @@ export function ordersList(orders, { status = 'active', client = '' } = {}) {
           <th class="border border-slate-300 px-3 py-2 w-32">Atendió</th>
         </tr>
       </thead>
-      ${renderTbody(orders)}
+      ${renderTbody(result.rows)}
     </table>
-  `
+    ${renderPager({ ...result, href, attrs: 'hx-target="#orders-results" hx-swap="outerHTML"' })}
+  </div>`
 }
 
 export function renderTbody(orders) {
@@ -85,7 +95,7 @@ function renderRow(order) {
       <td class="border border-slate-300 px-3 py-2">${formatDate(order.expected_delivery_date)}</td>
       <td class="border border-slate-300 px-3 py-2">${escapeHtml(orderStatusLabel(order.status))}</td>
       <td class="border border-slate-300 px-3 py-2">${formatMoney(order.total)}</td>
-      <td class="border border-slate-300 px-3 py-2">${order.paid ? 'Pagado' : 'Pendiente'}</td>
+      <td class="border border-slate-300 px-3 py-2">${order.refund_id ? 'Devuelto' : order.paid ? 'Pagado' : 'Pendiente'}</td>
       <td class="border border-slate-300 px-3 py-2">${escapeHtml(order.staff_name || '—')}</td>
     </tr>
   `

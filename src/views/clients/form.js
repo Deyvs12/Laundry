@@ -28,7 +28,8 @@ export function clientNewForm({ values = {}, error = null } = {}) {
       ${errorBox(error)}
       <form
         hx-post="/clients"
-        hx-target="#clients-tbody"
+        hx-include="#clients-filters"
+        hx-target="#clients-results"
         hx-swap="outerHTML"
         class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
         ${fields(values)}

@@ -10,12 +10,27 @@ import {
 // guardar recoge igual todos los campos, y a cambio evitamos dos problemas:
 // formularios anidados (el alta de cliente al vuelo vive aquí dentro) y envíos
 // accidentales al pulsar Enter en el mostrador.
-export function orderNewPage(initialServices, staff) {
+// Sirve para crear y para editar: en edición llega el pedido, sus líneas (ya
+// en formato buildLines) y el cliente, y el botón hace PUT en vez de POST.
+export function orderNewPage(initialServices, staff, { order = null, lines = [], client = null } = {}) {
+  const editing = Boolean(order)
+  const discount = editing ? order.discount : 0
+  const totals = { subtotal: 0, discount, total: 0 }
+  if (editing) {
+    totals.subtotal = lines.reduce((sum, l) => sum + l.sub_total, 0)
+    totals.total = totals.subtotal - discount
+  }
+  // min del calendario: hoy, salvo que el pedido ya tuviera una fecha anterior
+  // (se creó otro día); esa se puede conservar pero no elegir otra pasada.
+  const today = todayLocal()
+  const minDate = editing && order.expected_delivery_date && order.expected_delivery_date < today ? order.expected_delivery_date : today
+
   return `
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-semibold">Nuevo pedido</h1>
-      <a href="/orders" class="text-sm text-slate-600 hover:text-slate-900">Volver a pedidos</a>
+      <h1 class="text-2xl font-semibold">${editing ? `Editar pedido #${order.id}` : 'Nuevo pedido'}</h1>
+      <a href="${editing ? `/orders/${order.id}` : '/orders'}" class="text-sm text-slate-600 hover:text-slate-900">${editing ? 'Volver al pedido' : 'Volver a pedidos'}</a>
     </div>
+    ${editing ? '<p class="text-sm text-amber-700 mb-4">Al guardar, los servicios capturados reemplazan a los anteriores.</p>' : ''}
 
     <div id="order-form" class="space-y-6">
 
@@ -36,7 +51,7 @@ export function orderNewPage(initialServices, staff) {
 
         <div id="client-results" class="mt-2"></div>
 
-        ${clientBox(null)}
+        ${clientBox(client)}
 
         <div id="new-client" class="mt-3 pt-3 border-t border-slate-200">
           <p class="text-sm text-slate-500 mb-2">¿Cliente nuevo?</p>
@@ -70,7 +85,7 @@ export function orderNewPage(initialServices, staff) {
               <th class="border border-slate-300 px-3 py-2 w-24"></th>
             </tr>
           </thead>
-          ${renderLinesBody([])}
+          ${renderLinesBody(lines)}
         </table>
       </section>
 
@@ -84,7 +99,7 @@ export function orderNewPage(initialServices, staff) {
             name="discount"
             type="text"
             inputmode="decimal"
-            value="0"
+            value="${discount}"
             hx-post="/orders/new/summary"
             hx-include="#order-form"
             hx-target="#order-summary"
@@ -94,7 +109,7 @@ export function orderNewPage(initialServices, staff) {
           <p class="text-xs text-slate-500 mt-1">Monto fijo sobre el total. Queda registrado en la bitácora.</p>
         </div>
 
-        ${orderSummary({ subtotal: 0, discount: 0, total: 0 })}
+        ${orderSummary(totals)}
       </section>
 
       <section class="border border-slate-300 rounded p-4">
@@ -102,12 +117,14 @@ export function orderNewPage(initialServices, staff) {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <label class="block text-sm font-medium mb-1" for="expected">Entrega estimada</label>
-            <input id="expected" name="expected_delivery_date" type="date" min="${todayLocal()}"
+            <input id="expected" name="expected_delivery_date" type="date" min="${minDate}"
+              value="${editing ? escapeHtml(order.expected_delivery_date || '') : ''}"
               class="border border-slate-300 rounded px-3 py-2">
           </div>
           <div>
             <label class="block text-sm font-medium mb-1" for="notes">Notas</label>
             <input id="notes" name="notes" type="text" placeholder="Manchas, indicaciones…"
+              value="${editing ? escapeHtml(order.notes || '') : ''}"
               class="w-full border border-slate-300 rounded px-3 py-2">
           </div>
         </div>
@@ -115,18 +132,18 @@ export function orderNewPage(initialServices, staff) {
 
       <section class="border border-slate-300 rounded p-4">
         <h2 class="font-semibold mb-3">5. ¿Quién atendió?</h2>
-        ${staffPicker(staff)}
+        ${staffPicker(staff, editing ? String(order.id_staff ?? '') : '')}
       </section>
 
     </div>
 
     <div class="flex items-center gap-4 mt-4">
       <button
-        hx-post="/orders"
+        ${editing ? `hx-put="/orders/${order.id}"` : 'hx-post="/orders"'}
         hx-include="#order-form"
         hx-target="#order-error"
         hx-swap="innerHTML"
-        class="bg-slate-800 text-white px-4 py-2 rounded">Crear pedido</button>
+        class="bg-slate-800 text-white px-4 py-2 rounded">${editing ? 'Guardar cambios' : 'Crear pedido'}</button>
       <div id="order-error" class="text-sm text-red-600"></div>
     </div>
   `
@@ -135,7 +152,7 @@ export function orderNewPage(initialServices, staff) {
 // Un solo usuario inicia sesión, así que la persona que atendió se elige aquí.
 // Sin valor por defecto a propósito: una atribución equivocada es peor que un
 // clic más.
-function staffPicker(staff) {
+function staffPicker(staff, selected = '') {
   if (staff.length === 0) {
     return `<p class="text-sm text-red-600">
       No hay personal registrado.
@@ -144,7 +161,7 @@ function staffPicker(staff) {
   }
   return `
     <select name="id_staff" required class="border border-slate-300 rounded px-3 py-2 w-full md:w-72">
-      ${renderOptions(staff.map((p) => ({ value: String(p.id), label: p.name })), '', 'Selecciona una persona…')}
+      ${renderOptions(staff.map((p) => ({ value: String(p.id), label: p.name })), selected, 'Selecciona una persona…')}
     </select>
   `
 }

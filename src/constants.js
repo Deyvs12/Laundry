@@ -59,6 +59,8 @@ export const LOG_ACTIONS = [
   { value: 'ORDER_DISCOUNTED', label: 'Descuento' },
   { value: 'ORDER_PAID', label: 'Cobro' },
   { value: 'ORDER_CANCELLED', label: 'Pedido cancelado' },
+  { value: 'ORDER_REFUNDED', label: 'Devolución' },
+  { value: 'ORDER_EDITED', label: 'Pedido editado' },
   { value: 'SHIFT_OPENED', label: 'Caja abierta' },
   { value: 'SHIFT_CLOSED', label: 'Caja cerrada' },
   { value: 'USER_LOGIN', label: 'Inicio de sesión' },

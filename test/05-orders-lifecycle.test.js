@@ -48,7 +48,7 @@ describe('cobro', () => {
     ok(o.paid === 1 && o.payment_method === 'transfer' && typeof o.payment_day === 'string', 'cobrado')
     ok(o.cash_shift_id === null, 'sin turno → NULL')
     ok(logsOf(A).some((l) => l.action === 'ORDER_PAID' && l.message.includes('SIN turno')), 'log avisa SIN turno')
-    ok(html.includes('Pagado · Transferencia') && !html.includes(`/orders/${A}/pay"`) && !html.includes('/cancel"'), 'detalle actualizado')
+    ok(html.includes('Pagado · Transferencia') && !html.includes(`/orders/${A}/pay"`) && html.includes('Cancelar y devolver'), 'detalle actualizado: ya no cobra, ofrece devolver')
     html = await (await c.post(`/orders/${A}/pay`, { payment_method: 'cash' })).text()
     ok(html.includes('ya está pagado'), 'doble cobro')
   })
@@ -72,9 +72,22 @@ describe('entregar y cancelar', () => {
     ok(st(A) === 'delivered', 'cancelar bloqueado')
   })
 
+  test('cancelar un pagado devuelve el dinero', async () => {
+    const F = await createOrder(c, cid, [[2, 2]])   // $30
+    await c.post(`/orders/${F}/pay`, { payment_method: 'transfer' })
+    const html = await (await c.post(`/orders/${F}/cancel`)).text()
+    ok(st(F) === 'cancelled', 'cancelado')
+    const refund = db.query("SELECT * FROM Cash_movements WHERE order_id = ? AND type = 'refund'").get(F)
+    ok(refund && refund.amount === 30 && refund.method === 'transfer', 'movimiento de devolución por la misma vía')
+    ok(orderRow(F).paid === 1, 'el cobro original se conserva')
+    const acts = logsOf(F).map((l) => l.action)
+    ok(acts.includes('ORDER_REFUNDED') && acts.includes('ORDER_CANCELLED'), 'bitácora: devolución + cancelación')
+    ok(logsOf(F).find((l) => l.action === 'ORDER_CANCELLED').message.includes('con devolución de 30.00'), 'mensaje')
+    ok(html.includes('Devuelto $30.00') && html.includes('No admite más cambios'), 'detalle muestra devuelto')
+    ok((await (await c.get('/orders/list?status=cancelled')).text()).includes('Devuelto'), 'listado: Devuelto')
+  })
+
   test('cancelar', async () => {
-    let html = await (await c.post(`/orders/${B}/cancel`)).text()
-    ok(html.includes('requiere devolución') && st(B) === 'received', 'pagado → rechazado')
     await c.post(`/orders/${C}/start`)
     ok(st(C) === 'in_process', 'iniciar manual')
     ok((await (await c.post(`/orders/${C}/start`)).text()).includes('ya está en proceso'), 'iniciar dos veces')

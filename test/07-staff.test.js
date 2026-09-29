@@ -12,7 +12,7 @@ afterAll(stopServer)
 
 describe('migración v3', () => {
   test('tabla Staff y Orders.id_staff', () => {
-    ok(db.query('PRAGMA user_version').get().user_version === 3, 'user_version = 3')
+    ok(db.query('PRAGMA user_version').get().user_version >= 3, 'user_version >= 3')
     ok(db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='Staff'").get(), 'Staff existe')
     ok(db.query('PRAGMA table_info(Orders)').all().some((x) => x.name === 'id_staff'), 'Orders.id_staff')
   })

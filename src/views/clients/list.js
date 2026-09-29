@@ -1,6 +1,6 @@
-import { escapeHtml } from '../_helpers.js'
+import { escapeHtml, renderPager } from '../_helpers.js'
 
-export function clientsList(clients) {
+export function clientsList(result, filters) {
   return `
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-semibold">Clientes</h1>
@@ -13,8 +13,31 @@ export function clientsList(clients) {
       </button>
     </div>
 
+    <div id="clients-filters" class="mb-4">
+      <input
+        id="clients-q"
+        name="q"
+        type="text"
+        value="${escapeHtml(filters.q)}"
+        placeholder="Buscar por nombre o teléfono…"
+        autocomplete="off"
+        hx-get="/clients/list"
+        hx-trigger="input changed delay:300ms"
+        hx-target="#clients-results"
+        hx-swap="outerHTML"
+        class="w-full md:w-80 border border-slate-300 rounded px-3 py-2 text-sm">
+    </div>
+
     <div id="form-area" class="mb-4"></div>
 
+    ${renderResults(result, filters)}
+  `
+}
+
+// Tabla + paginador. Es lo que se reemplaza al buscar, paginar, crear o borrar.
+export function renderResults(result, filters) {
+  const href = (p) => `/clients/list?${new URLSearchParams({ q: filters.q, page: String(p) })}`
+  return `<div id="clients-results">
     <table class="w-full border border-slate-300 text-sm">
       <thead class="bg-slate-100 text-left">
         <tr>
@@ -24,15 +47,16 @@ export function clientsList(clients) {
           <th class="border border-slate-300 px-3 py-2 w-40">Acciones</th>
         </tr>
       </thead>
-      ${renderTbody(clients)}
+      ${renderTbody(result.rows)}
     </table>
-  `
+    ${renderPager({ ...result, href, attrs: 'hx-target="#clients-results" hx-swap="outerHTML"' })}
+  </div>`
 }
 
 export function renderTbody(clients) {
   if (clients.length === 0) {
     return `<tbody id="clients-tbody">
-      <tr><td colspan="4" class="border border-slate-300 px-3 py-3 text-center text-slate-500">Aún no hay clientes registrados.</td></tr>
+      <tr><td colspan="4" class="border border-slate-300 px-3 py-3 text-center text-slate-500">No hay clientes que coincidan.</td></tr>
     </tbody>`
   }
   return `<tbody id="clients-tbody">
@@ -55,7 +79,8 @@ export function renderRow(client) {
           class="text-blue-600 mr-3">Editar</button>
         <button
           hx-delete="/clients/${client.id}"
-          hx-target="#clients-tbody"
+          hx-include="#clients-filters"
+          hx-target="#clients-results"
           hx-swap="outerHTML"
           hx-confirm="¿Eliminar a ${safeName}?"
           class="text-red-600">Eliminar</button>

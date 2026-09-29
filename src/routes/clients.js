@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import {
   index,
+  listFragment,
   newForm,
   create,
   editForm,
@@ -12,6 +13,7 @@ import {
 const clientsRoutes = new Hono()
 
 clientsRoutes.get('/clients', index)
+clientsRoutes.get('/clients/list', listFragment)
 clientsRoutes.get('/clients/new', newForm)
 clientsRoutes.post('/clients', create)
 clientsRoutes.get('/clients/:id/edit', editForm)

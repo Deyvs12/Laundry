@@ -1,7 +1,7 @@
 import { escapeHtml, formatMoney, formatDateTime } from '../_helpers.js'
 import { paymentMethodLabel } from '../../constants.js'
 
-export function cashPage({ shift, summary, payments, history, unassigned, unassignedSummary, error = null }) {
+export function cashPage({ shift, summary, payments, refunds, history, unassigned, unassignedRefunds, unassignedSummary, error = null }) {
   return `
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-semibold">Caja</h1>
@@ -9,9 +9,9 @@ export function cashPage({ shift, summary, payments, history, unassigned, unassi
 
     ${error ? `<p class="mb-4 text-sm text-red-600 border border-red-200 bg-red-50 rounded px-3 py-2">${escapeHtml(error)}</p>` : ''}
 
-    ${shift ? openShiftPanel(shift, summary, payments) : openForm()}
+    ${shift ? openShiftPanel(shift, summary, payments, refunds) : openForm()}
 
-    ${unassignedPanel(unassigned, unassignedSummary)}
+    ${unassignedPanel(unassigned, unassignedRefunds, unassignedSummary)}
 
     <h2 class="font-semibold mt-8 mb-3">Cortes anteriores</h2>
     ${historyTable(history)}
@@ -35,8 +35,8 @@ function openForm() {
   `
 }
 
-function openShiftPanel(shift, summary, payments) {
-  const expected = shift.initial_cash + summary.cash_total
+function openShiftPanel(shift, summary, payments, refunds) {
+  const expected = shift.initial_cash + summary.cash_net
   return `
     <div class="border border-green-300 bg-green-50 rounded p-4 mb-4">
       <div class="flex flex-wrap justify-between gap-2 mb-3">
@@ -50,6 +50,7 @@ function openShiftPanel(shift, summary, payments) {
         ${stat(`Transferencias (${summary.transfer_count})`, formatMoney(summary.transfer_total))}
         ${stat('Efectivo esperado en cajón', formatMoney(expected), true)}
       </div>
+      ${summary.refund_count ? `<p class="text-sm text-red-700 mb-4">Devoluciones (${summary.refund_count}): ${formatMoney(summary.cash_refunds)} en efectivo, ${formatMoney(summary.transfer_refunds)} por transferencia. El efectivo devuelto ya está restado del esperado.</p>` : ''}
 
       <form hx-post="/cash/${shift.id}/close" hx-target="#main" hx-swap="innerHTML"
         hx-confirm="¿Cerrar el turno #${shift.id}? Después no se podrán registrar más cobros en efectivo hasta abrir otro."
@@ -65,13 +66,45 @@ function openShiftPanel(shift, summary, payments) {
 
     <h2 class="font-semibold mb-2">Cobros de este turno</h2>
     ${paymentsTable(payments)}
+    ${refundsTable(refunds)}
+  `
+}
+
+export function refundsTable(refunds) {
+  if (refunds.length === 0) return ''
+  return `
+    <h2 class="font-semibold mt-4 mb-2 text-red-700">Devoluciones</h2>
+    <table class="w-full border border-slate-300 text-sm">
+      <thead class="bg-slate-100 text-left">
+        <tr>
+          <th class="border border-slate-300 px-3 py-2 w-20">Folio</th>
+          <th class="border border-slate-300 px-3 py-2">Cliente</th>
+          <th class="border border-slate-300 px-3 py-2 w-40">Devuelto</th>
+          <th class="border border-slate-300 px-3 py-2 w-32">Forma</th>
+          <th class="border border-slate-300 px-3 py-2 w-28">Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${refunds
+          .map(
+            (r) => `<tr class="text-red-700">
+          <td class="border border-slate-300 px-3 py-2">${r.order_id ? `<a href="/orders/${r.order_id}" class="text-blue-600">#${r.order_id}</a>` : '—'}</td>
+          <td class="border border-slate-300 px-3 py-2">${escapeHtml(r.client_name || '—')}</td>
+          <td class="border border-slate-300 px-3 py-2">${formatDateTime(r.created_at)}</td>
+          <td class="border border-slate-300 px-3 py-2">${escapeHtml(paymentMethodLabel(r.method))}</td>
+          <td class="border border-slate-300 px-3 py-2">−${formatMoney(r.amount)}</td>
+        </tr>`
+          )
+          .join('')}
+      </tbody>
+    </table>
   `
 }
 
 // Dinero que entró sin turno abierto. El efectivo de aquí está físicamente en
 // el cajón pero ningún corte lo contó: es lo primero que el dueño debe revisar.
-function unassignedPanel(payments, summary) {
-  if (payments.length === 0) return ''
+function unassignedPanel(payments, refunds, summary) {
+  if (payments.length === 0 && refunds.length === 0) return ''
   return `
     <div class="border border-amber-300 bg-amber-50 rounded p-4 mt-6">
       <h2 class="font-semibold mb-1">Cobros sin turno de hoy</h2>
@@ -79,8 +112,10 @@ function unassignedPanel(payments, summary) {
         Se registraron hoy con la caja cerrada y no aparecen en ningún corte. Mañana esta lista arranca vacía; los anteriores siguen en Pedidos.
         Efectivo: <strong>${formatMoney(summary.cash_total)}</strong> (${summary.cash_count}) ·
         Transferencias: <strong>${formatMoney(summary.transfer_total)}</strong> (${summary.transfer_count})
+        ${summary.refund_count ? ` · Devoluciones: <strong class="text-red-700">−${formatMoney(summary.cash_refunds)}</strong> efectivo, <strong class="text-red-700">−${formatMoney(summary.transfer_refunds)}</strong> transferencia` : ''}
       </p>
-      ${paymentsTable(payments)}
+      ${payments.length ? paymentsTable(payments) : ''}
+      ${refundsTable(refunds)}
     </div>
   `
 }

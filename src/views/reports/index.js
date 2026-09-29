@@ -76,11 +76,12 @@ function summaryCards(s) {
     <div class="text-xs text-slate-500">${label}</div>
     <div class="text-xl font-semibold">${value}</div>
   </div>`
-  return `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-    ${card('Ingresos', formatMoney(s.revenue))}
+  return `<div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+    ${card('Ingresos netos', formatMoney(s.revenue))}
     ${card('Pedidos cobrados', s.orders)}
     ${card('Ticket promedio', formatMoney(s.average))}
     ${card('Descuentos otorgados', formatMoney(s.discounts))}
+    ${card(`Devoluciones (${s.refund_count})`, `<span class="${s.refunds > 0 ? 'text-red-700' : ''}">−${formatMoney(s.refunds)}</span>`)}
   </div>`
 }
 
@@ -99,16 +100,18 @@ function periodLabel(period, group) {
 function periodTable(rows, group) {
   return `<table class="w-full border border-slate-300 text-sm">
     <thead class="bg-slate-100 text-left"><tr>
-      <th class="${TH}">Periodo</th><th class="${TH} w-24">Pedidos</th>
-      <th class="${TH} w-32">Efectivo</th><th class="${TH} w-32">Transferencia</th><th class="${TH} w-32">Total</th>
+      <th class="${TH}">Periodo</th><th class="${TH} w-20">Pedidos</th>
+      <th class="${TH} w-28">Efectivo</th><th class="${TH} w-28">Transferencia</th>
+      <th class="${TH} w-28">Devoluciones</th><th class="${TH} w-28">Neto</th>
     </tr></thead>
     <tbody>${
       rows.length === 0
-        ? empty(5, 'Sin cobros en este periodo.')
+        ? empty(6, 'Sin cobros en este periodo.')
         : rows.map((r) => `<tr>
             <td class="${TD}">${periodLabel(r.period, group)}</td><td class="${TD}">${r.orders}</td>
             <td class="${TD}">${formatMoney(r.cash)}</td><td class="${TD}">${formatMoney(r.transfer)}</td>
-            <td class="${TD} font-semibold">${formatMoney(r.total)}</td>
+            <td class="${TD} ${r.refunds > 0 ? 'text-red-700' : 'text-slate-400'}">−${formatMoney(r.refunds)}</td>
+            <td class="${TD} font-semibold">${formatMoney(r.net)}</td>
           </tr>`).join('')
     }</tbody>
   </table>`
@@ -134,14 +137,15 @@ function typeTable(rows) {
 function methodTable(rows) {
   return `<table class="w-full border border-slate-300 text-sm">
     <thead class="bg-slate-100 text-left"><tr>
-      <th class="${TH}">Forma</th><th class="${TH} w-24">Pedidos</th><th class="${TH} w-32">Total</th>
+      <th class="${TH}">Forma</th><th class="${TH} w-20">Pedidos</th><th class="${TH} w-28">Cobrado</th><th class="${TH} w-28">Neto</th>
     </tr></thead>
     <tbody>${
       rows.length === 0
-        ? empty(3, 'Sin datos.')
+        ? empty(4, 'Sin datos.')
         : rows.map((r) => `<tr>
             <td class="${TD}">${escapeHtml(paymentMethodLabel(r.method))}</td><td class="${TD}">${r.orders}</td>
-            <td class="${TD}">${formatMoney(r.total)}</td>
+            <td class="${TD}">${formatMoney(r.total)}${r.refunds > 0 ? ` <span class="text-red-700 text-xs">−${formatMoney(r.refunds)}</span>` : ''}</td>
+            <td class="${TD} font-semibold">${formatMoney(r.net)}</td>
           </tr>`).join('')
     }</tbody>
   </table>`

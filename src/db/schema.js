@@ -83,6 +83,21 @@ export const schema = `
     FOREIGN KEY (id_services) REFERENCES Services(id)
   );
 
+  CREATE TABLE IF NOT EXISTS Cash_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT CHECK(type IN ('refund', 'withdrawal', 'deposit', 'expense')) NOT NULL,
+    method TEXT CHECK(method IN ('cash', 'transfer')) NOT NULL,
+    amount REAL NOT NULL,
+    order_id INTEGER,
+    cash_shift_id INTEGER,
+    user_id INTEGER NOT NULL,
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES Orders(id),
+    FOREIGN KEY (cash_shift_id) REFERENCES Cash_shifts(id),
+    FOREIGN KEY (user_id) REFERENCES Users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS Logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -94,6 +109,8 @@ export const schema = `
       'ORDER_DISCOUNTED',
       'ORDER_PAID',
       'ORDER_CANCELLED',
+      'ORDER_REFUNDED',
+      'ORDER_EDITED',
       'SHIFT_OPENED',
       'SHIFT_CLOSED',
       'USER_LOGIN',

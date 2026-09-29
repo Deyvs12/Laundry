@@ -74,3 +74,18 @@ export function renderOptions(options, selected, placeholder = null) {
       .join('')
   )
 }
+
+// Paginador para fragmentos htmx. href(page) devuelve la URL; attrs son los
+// hx-target/hx-swap del contenedor que se reemplaza.
+export function renderPager({ page, pages, total, href, attrs }) {
+  if (pages <= 1) return ''
+  const link = (p, label) =>
+    `<a href="${href(p)}" hx-get="${href(p)}" ${attrs} class="px-3 py-1 rounded bg-slate-200 text-sm">${label}</a>`
+  return `<div class="flex items-center justify-between mt-3 text-sm text-slate-600">
+    <span>Página ${page} de ${pages} · ${total} en total</span>
+    <div class="flex gap-2">
+      ${page > 1 ? link(page - 1, '← Anteriores') : ''}
+      ${page < pages ? link(page + 1, 'Siguientes →') : ''}
+    </div>
+  </div>`
+}

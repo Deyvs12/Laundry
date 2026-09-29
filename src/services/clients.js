@@ -1,14 +1,23 @@
 import db from '../db/database.js'
 
-export function list() {
-  return db
-    .query(
-      `SELECT id, name, phone, notes, created_at
-       FROM Clients
-       WHERE is_active = 1
-       ORDER BY name`
-    )
-    .all()
+export const PAGE_SIZE = 50
+
+// Listado paginado con búsqueda por nombre o teléfono.
+export function list({ q = '', page = 1, pageSize = PAGE_SIZE } = {}) {
+  const where = ['is_active = 1']
+  const params = []
+  if (q) {
+    where.push(`(name LIKE ?1 ESCAPE '\\' OR phone LIKE ?1 ESCAPE '\\')`)
+    params.push(`%${q.replace(/[\\%_]/g, (m) => '\\' + m)}%`)
+  }
+  const clause = where.join(' AND ')
+  const total = db.query(`SELECT COUNT(*) n FROM Clients WHERE ${clause}`).get(...params).n
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  const current = Math.min(Math.max(1, page), pages)
+  const rows = db
+    .query(`SELECT id, name, phone, notes, created_at FROM Clients WHERE ${clause} ORDER BY name LIMIT ? OFFSET ?`)
+    .all(...params, pageSize, (current - 1) * pageSize)
+  return { rows, total, page: current, pages }
 }
 
 export function findById(id) {

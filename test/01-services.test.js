@@ -8,7 +8,7 @@ afterAll(stopServer)
 
 describe('base', () => {
   test('migraciones aplicadas en DB nueva', () => {
-    ok(db.query('PRAGMA user_version').get().user_version === 3, 'user_version = 3')
+    ok(db.query('PRAGMA user_version').get().user_version === 4, 'user_version = 4')
     const cols = db.query('PRAGMA table_info(Orders)').all().map((x) => x.name)
     ok(cols.includes('discount') && cols.includes('cash_shift_id'), 'Orders tiene discount y cash_shift_id')
     ok(db.query("SELECT sql FROM sqlite_master WHERE name = 'Logs'").get().sql.includes('ORDER_DISCOUNTED'), 'Logs acepta ORDER_DISCOUNTED')

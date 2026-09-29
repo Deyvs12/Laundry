@@ -1,13 +1,25 @@
 import * as clients from '../services/clients.js'
 import { render } from '../render.js'
-import { clientsList, renderTbody, renderRow } from '../views/clients/list.js'
+import { clientsList, renderResults, renderRow } from '../views/clients/list.js'
 import { clientNewForm, clientEditRow } from '../views/clients/form.js'
 
+function readFilters(source) {
+  const page = Number(source.page)
+  return {
+    q: (source.q || '').toString().trim(),
+    page: Number.isInteger(page) && page > 0 ? page : 1
+  }
+}
+
 export function index(c) {
-  const user = c.get('user')
-  const rows = clients.list()
-  const body = clientsList(rows)
-  return render(c, { title: 'Clientes — Laundry', body })
+  const filters = readFilters(c.req.query())
+  return render(c, { title: 'Clientes — Laundry', body: clientsList(clients.list(filters), filters) })
+}
+
+// Fragmento (tabla + paginador): búsqueda y paginación.
+export function listFragment(c) {
+  const filters = readFilters(c.req.query())
+  return c.html(renderResults(clients.list(filters), filters))
 }
 
 // Devuelve { values, error } — error null si todo está bien.
@@ -27,23 +39,25 @@ export function newForm(c) {
 }
 
 export async function create(c) {
-  const { values, error } = readForm(await c.req.parseBody())
-  const tbody = renderTbody(clients.list())
+  const body = await c.req.parseBody()
+  const { values, error } = readForm(body)
+  // El filtro de búsqueda viaja con el POST (hx-include) para repintar la
+  // misma vista que el usuario tenía.
+  const filters = readFilters(body)
+  const results = () => renderResults(clients.list(filters), filters)
 
   // 200 a propósito: htmx no hace swap en respuestas de error, así que un 400
   // dejaría la pantalla congelada sin explicar nada.
   if (error) {
     return c.html(
-      `${tbody}<div id="form-area" class="mb-4" hx-swap-oob="true">${clientNewForm({ values, error })}</div>`
+      `${results()}<div id="form-area" class="mb-4" hx-swap-oob="true">${clientNewForm({ values, error })}</div>`
     )
   }
 
   clients.create(values)
 
-  // OOB para limpiar el form-area junto con la respuesta del tbody
-  return c.html(
-    `${renderTbody(clients.list())}<div id="form-area" class="mb-4" hx-swap-oob="true"></div>`
-  )
+  // OOB para limpiar el form-area junto con la respuesta de la tabla
+  return c.html(`${results()}<div id="form-area" class="mb-4" hx-swap-oob="true"></div>`)
 }
 
 export function editForm(c) {
@@ -75,5 +89,7 @@ export async function update(c) {
 export function destroy(c) {
   const id = Number(c.req.param('id'))
   clients.softDelete(id)
-  return c.html(renderTbody(clients.list()))
+  // htmx manda los parámetros de un DELETE en la URL, no en el cuerpo.
+  const filters = readFilters(c.req.query())
+  return c.html(renderResults(clients.list(filters), filters))
 }

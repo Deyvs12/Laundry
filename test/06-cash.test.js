@@ -69,6 +69,22 @@ describe('cobros dentro del turno', () => {
   })
 })
 
+describe('devoluciones en el turno', () => {
+  test('restan del esperado, se listan y se ligan al turno', async () => {
+    const o = await newOrder(2)   // $80
+    await A.post(`/orders/${o}/pay`, { payment_method: 'cash' })
+    await A.post(`/orders/${o}/cancel`)
+    const refund = db.query("SELECT * FROM Cash_movements WHERE order_id = ?").get(o)
+    ok(refund.cash_shift_id === 1 && refund.method === 'cash' && refund.amount === 80, 'ligada al turno 1')
+    const html = await (await A.get('/cash')).text()
+    ok(html.includes('Devoluciones (1)') && html.includes('$80.00 en efectivo'), 'aviso en el panel')
+    ok(html.includes('>Devoluciones<') && html.includes('−$80.00'), 'tabla de devoluciones')
+    // esperado: 500.50 + (120 + 80 cobrados) − 80 devueltos = 620.50
+    ok(html.includes('$620.50'), 'esperado descuenta la devolución')
+    ok(db.query("SELECT message FROM Logs WHERE action = 'ORDER_REFUNDED'").get().message.includes('turno #1'), 'log con turno')
+  })
+})
+
 describe('cerrar', () => {
   test('validación, cierre por admin, diferencia, log, detalle', async () => {
     let r = await A.post('/cash/1/close', { actual_cash: '-5' })
@@ -83,6 +99,7 @@ describe('cerrar', () => {
     ok((await (await A.post('/cash/1/close', { actual_cash: '600' })).text()).includes('ya está cerrado'), 'doble cierre')
     let html = await (await A.get('/cash/1')).text()
     ok(html.includes('cerrado') && html.includes('Administrador') && html.includes('(falta)') && html.includes('$20.50'), 'detalle')
+    ok(html.includes('Devoluciones (1)') && html.includes('−$80.00'), 'detalle del turno lista la devolución')
     html = await (await A.get('/cash')).text()
     ok(html.includes('No hay turno abierto') && html.includes('href="/cash/1"') && html.includes('$620.50'), 'vuelve a apertura + histórico')
   })
@@ -104,6 +121,15 @@ describe('cerrar', () => {
     ok(html.includes('Efectivo: <strong>$80.00</strong> (2)') && !html.includes(`/orders/${o}"`), 'el de ayer ya no aparece')
     ok(orderRow(o).paid === 1, 'pero sigue pagado en la DB')
     db.query(`UPDATE Orders SET payment_day = datetime('now', '-3 hours') WHERE id IN (SELECT id FROM Orders WHERE paid = 1 AND cash_shift_id IS NULL)`).run()
+  })
+
+  test('devolución sin turno aparece en "sin turno de hoy"', async () => {
+    const o = await newOrder(1)   // $40
+    await A.post(`/orders/${o}/pay`, { payment_method: 'transfer' })
+    await A.post(`/orders/${o}/cancel`)
+    ok(db.query('SELECT cash_shift_id FROM Cash_movements WHERE order_id = ?').get(o).cash_shift_id === null, 'sin turno')
+    const html = await (await A.get('/cash')).text()
+    ok(html.includes('−$40.00</strong> transferencia'), 'resumen sin turno incluye la devolución')
   })
 
   test('cuadra, sobra, fondo cero, abierto no está en histórico', async () => {

@@ -18,7 +18,9 @@ import {
   addLine,
   removeLine,
   refreshSummary,
-  create
+  create,
+  editPage,
+  update
 } from '../controllers/orders.js'
 
 const ordersRoutes = new Hono()
@@ -40,6 +42,8 @@ ordersRoutes.post('/orders/new/summary', refreshSummary)
 
 ordersRoutes.post('/orders', create)
 ordersRoutes.get('/orders/:id', show)
+ordersRoutes.get('/orders/:id/edit', editPage)
+ordersRoutes.put('/orders/:id', update)
 ordersRoutes.post('/orders/:id/start', start)
 ordersRoutes.post('/orders/:id/ready-all', readyAll)
 ordersRoutes.post('/orders/:id/lines/:lineId/toggle', toggleLine)

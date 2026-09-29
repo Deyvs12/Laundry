@@ -1,6 +1,7 @@
 import db from '../db/database.js'
 import * as logs from './logs.js'
 import { round2 } from '../money.js'
+import * as cashMovements from './cash_movements.js'
 
 export class ShiftError extends Error {}
 
@@ -42,11 +43,17 @@ export function summary(shiftId) {
     )
     .get(shiftId)
 
+  const refunds = cashMovements.refundTotalsOfShift(shiftId)
   return {
     cash_total: round2(row.cash_total),
     cash_count: row.cash_count,
     transfer_total: round2(row.transfer_total),
-    transfer_count: row.transfer_count
+    transfer_count: row.transfer_count,
+    cash_refunds: refunds.cash,
+    transfer_refunds: refunds.transfer,
+    refund_count: refunds.count,
+    // Lo que debe haber en el cajón por encima del fondo inicial.
+    cash_net: round2(row.cash_total - refunds.cash)
   }
 }
 
@@ -97,11 +104,15 @@ export function unassignedSummary() {
        WHERE ${TODAY_UNASSIGNED}`
     )
     .get()
+  const refunds = cashMovements.refundTotalsUnassignedToday()
   return {
     cash_total: round2(row.cash_total),
     cash_count: row.cash_count,
     transfer_total: round2(row.transfer_total),
-    transfer_count: row.transfer_count
+    transfer_count: row.transfer_count,
+    cash_refunds: refunds.cash,
+    transfer_refunds: refunds.transfer,
+    refund_count: refunds.count
   }
 }
 
@@ -125,8 +136,8 @@ export const open = db.transaction(({ userId, initialCash }) => {
   return id
 })
 
-// expected = fondo inicial + efectivo cobrado. difference = contado − esperado:
-// positivo sobra dinero, negativo falta.
+// expected = fondo inicial + efectivo cobrado − efectivo devuelto.
+// difference = contado − esperado: positivo sobra dinero, negativo falta.
 export const close = db.transaction(({ shiftId, userId, actualCash }) => {
   const shift = findById(shiftId)
   if (!shift) throw new ShiftError('Turno no encontrado')
@@ -135,8 +146,8 @@ export const close = db.transaction(({ shiftId, userId, actualCash }) => {
     throw new ShiftError('El efectivo contado debe ser un número mayor o igual a 0')
   }
 
-  const { cash_total } = summary(shiftId)
-  const expected = round2(shift.initial_cash + cash_total)
+  const { cash_net } = summary(shiftId)
+  const expected = round2(shift.initial_cash + cash_net)
   const actual = round2(actualCash)
   const difference = round2(actual - expected)
 

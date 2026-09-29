@@ -21,7 +21,7 @@ export function stopServer() {
 // Los archivos de test comparten proceso y DB: cada uno arranca limpio.
 export function resetDb() {
   db.exec('PRAGMA foreign_keys = OFF')
-  for (const t of ['Logs', 'Order_services', 'Orders', 'Cash_shifts', 'Services', 'Clients', 'Staff', 'Users']) {
+  for (const t of ['Logs', 'Cash_movements', 'Order_services', 'Orders', 'Cash_shifts', 'Services', 'Clients', 'Staff', 'Users']) {
     db.exec(`DELETE FROM ${t}`)
   }
   db.exec('DELETE FROM sqlite_sequence')

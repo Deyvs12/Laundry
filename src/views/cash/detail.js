@@ -1,7 +1,7 @@
 import { escapeHtml, formatMoney, formatDateTime } from '../_helpers.js'
-import { paymentsTable, differenceCell } from './index.js'
+import { paymentsTable, refundsTable, differenceCell } from './index.js'
 
-export function shiftDetail(shift, summary, payments) {
+export function shiftDetail(shift, summary, payments, refunds) {
   const open = shift.status === 'open'
   return `
     <div class="flex items-center justify-between mb-4">
@@ -17,13 +17,15 @@ export function shiftDetail(shift, summary, payments) {
       ${row('Fondo inicial', formatMoney(shift.initial_cash))}
       ${row(`Efectivo cobrado (${summary.cash_count})`, formatMoney(summary.cash_total))}
       ${row(`Transferencias (${summary.transfer_count})`, formatMoney(summary.transfer_total))}
-      ${row('Efectivo esperado', formatMoney(open ? shift.initial_cash + summary.cash_total : shift.expected_cash))}
+      ${summary.refund_count ? row(`Devoluciones (${summary.refund_count})`, `<span class="text-red-700">−${formatMoney(summary.cash_refunds)} efectivo · −${formatMoney(summary.transfer_refunds)} transferencia</span>`) : ''}
+      ${row('Efectivo esperado', formatMoney(open ? shift.initial_cash + summary.cash_net : shift.expected_cash))}
       ${open ? '' : row('Efectivo contado', formatMoney(shift.actual_cash))}
       ${open ? '' : row('Diferencia', differenceCell(shift.difference))}
     </div>
 
     <h2 class="font-semibold mb-2">Cobros del turno</h2>
     ${paymentsTable(payments)}
+    ${refundsTable(refunds)}
   `
 }
 

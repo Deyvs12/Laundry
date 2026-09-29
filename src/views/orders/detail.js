@@ -6,7 +6,7 @@ import {
   paymentMethodLabel,
   quantityUnit
 } from '../../constants.js'
-import { isFinal } from '../../services/orders.js'
+import { isFinal, isEditable } from '../../services/orders.js'
 
 // Todo el detalle es un solo fragmento (#order-detail). Cada acción lo
 // devuelve completo: es lo más simple y garantiza que estado, líneas y
@@ -24,6 +24,7 @@ export function orderDetail(order, lines, { error = null, shift = null } = {}) {
         <span class="text-base font-normal text-slate-500">· ${escapeHtml(orderStatusLabel(order.status))}</span>
       </h1>
       <div class="flex gap-4 text-sm">
+        ${isEditable(order) ? `<a href="/orders/${order.id}/edit" class="text-blue-600 hover:text-blue-800">Editar</a>` : ''}
         <a href="/logs?order=${order.id}" class="text-slate-600 hover:text-slate-900">Bitácora</a>
         <a href="/orders" class="text-slate-600 hover:text-slate-900">Volver a pedidos</a>
       </div>
@@ -81,6 +82,10 @@ function field(label, value) {
 
 function paymentSummary(order) {
   if (!order.paid) return '<span class="text-amber-700">Pendiente</span>'
+  if (order.refund_id) {
+    return `<span class="text-red-700">Devuelto ${formatMoney(order.refund_amount)} · ${escapeHtml(paymentMethodLabel(order.refund_method))} · ${formatDateTime(order.refund_day)}</span>
+      <span class="text-slate-500">(cobrado el ${formatDateTime(order.payment_day)})</span>`
+  }
   return `Pagado · ${escapeHtml(paymentMethodLabel(order.payment_method))} · ${formatDateTime(order.payment_day)}${
     order.cash_shift_id ? ` · <a href="/cash/${order.cash_shift_id}" class="text-blue-600">turno #${order.cash_shift_id}</a>` : ''
   }`
@@ -150,7 +155,10 @@ function actions(order, lines, final, act, shift) {
       </div>`
 
   const cancelBtn = order.paid
-    ? ''
+    ? `<div class="mt-3">
+        <button ${act('cancel')} hx-confirm="¿Cancelar el pedido #${order.id} y devolver ${formatMoney(order.total)} en ${paymentMethodLabel(order.payment_method).toLowerCase()}? Esta acción no se puede deshacer."
+          class="text-sm text-red-600 underline">Cancelar y devolver ${formatMoney(order.total)}</button>
+      </div>`
     : `<div class="mt-3">
         <button ${act('cancel')} hx-confirm="¿Cancelar el pedido #${order.id}? Esta acción no se puede deshacer."
           class="text-sm text-red-600 underline">Cancelar pedido</button>

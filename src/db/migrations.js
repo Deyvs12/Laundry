@@ -61,6 +61,42 @@ function rebuildLogs(db) {
   db.exec('ALTER TABLE Logs_v1 RENAME TO Logs')
 }
 
+// DDL de Logs congelado en v4: añade ORDER_REFUNDED y ORDER_EDITED al CHECK.
+function rebuildLogsV4(db) {
+  db.exec(`
+    CREATE TABLE Logs_v4 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      order_id INTEGER,
+      cash_shift_id INTEGER,
+      action TEXT CHECK(action IN (
+        'ORDER_CREATED',
+        'ORDER_STATUS_CHANGED',
+        'ORDER_DISCOUNTED',
+        'ORDER_PAID',
+        'ORDER_CANCELLED',
+        'ORDER_REFUNDED',
+        'ORDER_EDITED',
+        'SHIFT_OPENED',
+        'SHIFT_CLOSED',
+        'USER_LOGIN',
+        'USER_LOGOUT'
+      )) NOT NULL,
+      message TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES Users(id),
+      FOREIGN KEY (order_id) REFERENCES Orders(id),
+      FOREIGN KEY (cash_shift_id) REFERENCES Cash_shifts(id)
+    )
+  `)
+  db.exec(`
+    INSERT INTO Logs_v4 (id, user_id, order_id, cash_shift_id, action, message, created_at)
+    SELECT id, user_id, order_id, cash_shift_id, action, message, created_at FROM Logs
+  `)
+  db.exec('DROP TABLE Logs')
+  db.exec('ALTER TABLE Logs_v4 RENAME TO Logs')
+}
+
 const migrations = [
   {
     version: 1,
@@ -112,6 +148,30 @@ const migrations = [
       if (!hasColumn(db, 'Orders', 'id_staff')) {
         db.exec('ALTER TABLE Orders ADD COLUMN id_staff INTEGER REFERENCES Staff(id)')
       }
+    }
+  },
+  {
+    version: 4,
+    name: 'Cash_movements (devoluciones) y Logs.ORDER_REFUNDED/ORDER_EDITED',
+    up(db) {
+      // Dinero que sale del cajón sin ser una venta: por ahora solo
+      // devoluciones, pero el CHECK deja sitio a retiros, depósitos y gastos
+      // porque cambiarlo después obliga a reconstruir la tabla.
+      db.exec(`CREATE TABLE IF NOT EXISTS Cash_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT CHECK(type IN ('refund', 'withdrawal', 'deposit', 'expense')) NOT NULL,
+        method TEXT CHECK(method IN ('cash', 'transfer')) NOT NULL,
+        amount REAL NOT NULL,
+        order_id INTEGER,
+        cash_shift_id INTEGER,
+        user_id INTEGER NOT NULL,
+        note TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES Orders(id),
+        FOREIGN KEY (cash_shift_id) REFERENCES Cash_shifts(id),
+        FOREIGN KEY (user_id) REFERENCES Users(id)
+      )`)
+      if (!tableSql(db, 'Logs').includes('ORDER_REFUNDED')) rebuildLogsV4(db)
     }
   }
 ]

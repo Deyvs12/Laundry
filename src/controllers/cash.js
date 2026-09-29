@@ -1,4 +1,5 @@
 import * as cashShifts from '../services/cash_shifts.js'
+import * as cashMovements from '../services/cash_movements.js'
 import { render } from '../render.js'
 import { cashPage } from '../views/cash/index.js'
 import { shiftDetail } from '../views/cash/detail.js'
@@ -13,8 +14,10 @@ function pageData(error = null) {
     shift,
     summary: shift ? cashShifts.summary(shift.id) : null,
     payments: shift ? cashShifts.paymentsOf(shift.id) : [],
+    refunds: shift ? cashMovements.refundsOfShift(shift.id) : [],
     history: cashShifts.list(),
     unassigned: cashShifts.unassignedPayments(),
+    unassignedRefunds: cashMovements.refundsUnassignedToday(),
     unassignedSummary: cashShifts.unassignedSummary(),
     error
   }
@@ -54,6 +57,6 @@ export async function close(c) {
 export function show(c) {
   const shift = cashShifts.findById(Number(c.req.param('id')))
   if (!shift) return c.text('Turno no encontrado', 404)
-  const body = shiftDetail(shift, cashShifts.summary(shift.id), cashShifts.paymentsOf(shift.id))
+  const body = shiftDetail(shift, cashShifts.summary(shift.id), cashShifts.paymentsOf(shift.id), cashMovements.refundsOfShift(shift.id))
   return render(c, { title: `Turno #${shift.id} — Laundry`, body })
 }

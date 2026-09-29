@@ -3,6 +3,7 @@ import * as logs from './logs.js'
 import * as servicesRepo from './services.js'
 import { round2 } from '../money.js'
 import * as cashShifts from './cash_shifts.js'
+import * as cashMovements from './cash_movements.js'
 import { orderStatusLabel, paymentMethodLabel, isPaymentMethod } from '../constants.js'
 
 export { round2 }
@@ -94,17 +95,64 @@ export function create(data) {
   return insertOrder(data)
 }
 
+// Editable mientras nadie haya empezado a trabajarlo ni se haya cobrado: en
+// cuanto hay dinero de por medio, cambiar el total rompería el cobro.
+export const isEditable = (order) => order.status === 'received' && !order.paid
+
+// Reemplaza líneas y cabecera. Las líneas viejas se descartan enteras (en
+// "recibido" ninguna está lista todavía, así que no se pierde avance).
+const replaceOrder = db.transaction(
+  (orderId, { idClient, idStaff, staffName, lines, discount, notes, expectedDelivery }, userId) => {
+    const order = getRow(orderId)
+    if (!order) throw new OrderError('Pedido no encontrado')
+    if (!isEditable(order)) throw new OrderError('Solo se puede editar un pedido recibido y sin cobrar')
+
+    const { total } = totalsFor(lines, discount)
+
+    db.query('DELETE FROM Order_services WHERE id_orders = ?').run(orderId)
+    const insertLine = db.query(
+      `INSERT INTO Order_services (id_orders, id_services, quantity, unit_price, sub_total)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    for (const line of lines) {
+      insertLine.run(orderId, line.id_services, line.quantity, line.unit_price, line.sub_total)
+    }
+
+    db.query(
+      `UPDATE Orders
+       SET id_client = ?, id_staff = ?, discount = ?, total = ?, notes = ?, expected_delivery_date = ?
+       WHERE id = ?`
+    ).run(idClient, idStaff, discount, total, notes || null, expectedDelivery || null, orderId)
+
+    logs.insert({
+      userId,
+      orderId,
+      action: 'ORDER_EDITED',
+      message: `Pedido #${orderId} editado por ${staffName}: ${lines.length} servicio(s), total ${order.total.toFixed(2)} → ${total.toFixed(2)}${
+        discount !== order.discount ? `, descuento ${order.discount.toFixed(2)} → ${discount.toFixed(2)}` : ''
+      }`
+    })
+  }
+)
+
+export function update(orderId, data, userId) {
+  return replaceOrder(orderId, data, userId)
+}
+
 const LIST_COLUMNS = `
-  o.id, o.status, o.total, o.discount, o.paid, o.payment_method, o.payment_day,
+  o.id, o.id_client, o.id_staff, o.status, o.total, o.discount, o.paid, o.payment_method, o.payment_day,
   o.cash_shift_id, o.created_at, o.expected_delivery_date,
   c.name AS client_name, c.phone AS client_phone,
-  u.name AS user_name, st.name AS staff_name`
+  u.name AS user_name, st.name AS staff_name,
+  r.id AS refund_id, r.amount AS refund_amount, r.method AS refund_method, r.created_at AS refund_day`
 
 export const ACTIVE_STATUSES = ['received', 'in_process', 'ready']
+export const PAGE_SIZE = 50
 
 // status: 'active' (por defecto) | 'all' | uno concreto.
 // client: texto libre contra nombre o teléfono.
-export function list({ status = 'active', client = '', limit = 200 } = {}) {
+// Devuelve { rows, total, page, pages }.
+export function list({ status = 'active', client = '', page = 1, pageSize = PAGE_SIZE } = {}) {
   const where = []
   const params = []
 
@@ -130,18 +178,28 @@ export function list({ status = 'active', client = '', limit = 200 } = {}) {
          o.expected_delivery_date, o.id DESC`
       : 'o.id DESC'
 
-  return db
+  const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : ''
+  const total = db
+    .query(`SELECT COUNT(*) n FROM Orders o JOIN Clients c ON c.id = o.id_client ${whereSql}`)
+    .get(...params).n
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  const current = Math.min(Math.max(1, page), pages)
+
+  const rows = db
     .query(
       `SELECT ${LIST_COLUMNS}
        FROM Orders o
        JOIN Clients c ON c.id = o.id_client
        JOIN Users u ON u.id = o.id_user
        LEFT JOIN Staff st ON st.id = o.id_staff
-       ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+       LEFT JOIN Cash_movements r ON r.order_id = o.id AND r.type = 'refund'
+       ${whereSql}
        ORDER BY ${order}
-       LIMIT ?`
+       LIMIT ? OFFSET ?`
     )
-    .all(...params, limit)
+    .all(...params, pageSize, (current - 1) * pageSize)
+
+  return { rows, total, page: current, pages }
 }
 
 export function findById(id) {
@@ -152,6 +210,7 @@ export function findById(id) {
        JOIN Clients c ON c.id = o.id_client
        JOIN Users u ON u.id = o.id_user
        LEFT JOIN Staff st ON st.id = o.id_staff
+       LEFT JOIN Cash_movements r ON r.order_id = o.id AND r.type = 'refund'
        WHERE o.id = ?`
     )
     .get(id)
@@ -160,7 +219,7 @@ export function findById(id) {
 export function linesOf(orderId) {
   return db
     .query(
-      `SELECT os.id, os.quantity, os.unit_price, os.sub_total, os.status,
+      `SELECT os.id, os.id_services, os.quantity, os.unit_price, os.sub_total, os.status,
               s.name, s.type, s.price_type
        FROM Order_services os
        JOIN Services s ON s.id = os.id_services
@@ -300,15 +359,40 @@ export const deliver = db.transaction((orderId, userId) => {
 export const cancel = db.transaction((orderId, userId) => {
   const order = getRow(orderId)
   requireEditable(order)
-  // Cancelar algo ya cobrado implica devolver dinero, y eso toca la caja.
-  // Se resuelve cuando exista el módulo de caja; mientras, se bloquea.
-  if (order.paid) throw new OrderError('Un pedido ya pagado no se puede cancelar: requiere devolución')
+
+  // Si ya se cobró, cancelar implica devolver el dinero. La venta original se
+  // conserva tal cual (entró en su día y en su corte); la devolución es un
+  // movimiento propio con su fecha, y así el corte de HOY la resta. Se
+  // devuelve por la misma vía en que se cobró.
+  let refundNote = ''
+  if (order.paid) {
+    const shift = cashShifts.findOpen()
+    cashMovements.insert({
+      type: 'refund',
+      method: order.payment_method,
+      amount: order.total,
+      orderId,
+      cashShiftId: shift?.id ?? null,
+      userId,
+      note: `Cancelación del pedido #${orderId}`
+    })
+    logs.insert({
+      userId,
+      orderId,
+      cashShiftId: shift?.id ?? null,
+      action: 'ORDER_REFUNDED',
+      message: `Devolución de ${order.total.toFixed(2)} en ${paymentMethodLabel(order.payment_method).toLowerCase()} por el pedido #${orderId}${
+        shift ? ` (turno #${shift.id})` : ' — SIN turno de caja abierto'
+      }`
+    })
+    refundNote = ` con devolución de ${order.total.toFixed(2)}`
+  }
 
   db.query(`UPDATE Orders SET status = 'cancelled' WHERE id = ?`).run(orderId)
   logs.insert({
     userId,
     orderId,
     action: 'ORDER_CANCELLED',
-    message: `Pedido #${orderId} cancelado (estaba ${orderStatusLabel(order.status).toLowerCase()})`
+    message: `Pedido #${orderId} cancelado (estaba ${orderStatusLabel(order.status).toLowerCase()})${refundNote}`
   })
 })

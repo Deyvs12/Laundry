@@ -56,6 +56,27 @@ describe('consultas', () => {
   })
 })
 
+describe('devoluciones', () => {
+  test('se restan el día que ocurren, por forma de pago y en el neto', async () => {
+    const rep = await import('../src/services/reports.js')
+    const today = { from: daysFromNow(0), to: daysFromNow(0) }
+    const before = rep.summary(today)
+    const o = await createOrder(c, ana, [[2, 2]])   // $40
+    setPaid(o, 'transfer', daysFromNow(-3))          // cobrado hace 3 días
+    await c.post(`/orders/${o}/cancel`)              // devuelto HOY
+    const after = rep.summary(today)
+    ok(after.orders === before.orders && after.refunds === 40 && after.refund_count === 1, 'hoy: mismos cobros, 1 devolución de 40')
+    ok(after.revenue === before.revenue - 40, 'neto de hoy baja 40')
+    const days = rep.revenueByPeriod({ from: daysFromNow(-7), to: daysFromNow(0), group: 'day' })
+    const todayRow = days.find((d) => d.period === daysFromNow(0))
+    ok(todayRow.refunds === 40 && todayRow.net === todayRow.total - 40, 'fila de hoy con devolución y neto')
+    const m = Object.fromEntries(rep.byPaymentMethod({ from: daysFromNow(-7), to: daysFromNow(0) }).map((x) => [x.method, x]))
+    ok(m.transfer.refunds === 40 && m.transfer.net === m.transfer.total - 40, 'por forma de pago')
+    const html = await (await c.get('/reports?preset=today')).text()
+    ok(html.includes('Devoluciones (1)') && html.includes('−$40.00'), 'tarjeta y tabla')
+  })
+})
+
 describe('página', () => {
   test('presets, rango personalizado, agrupación, validación', async () => {
     let html = await (await c.get('/reports?preset=today')).text()
@@ -86,7 +107,7 @@ describe('respaldo', () => {
     ok(new TextDecoder().decode(buf.slice(0, 15)) === 'SQLite format 3', 'es un archivo SQLite')
     const { Database } = await import('bun:sqlite')
     const copy = new Database(`${process.env.LAVANDERIA_BACKUPS}/${name}`, { readonly: true })
-    ok(copy.query('SELECT COUNT(*) n FROM Orders').get().n === 5, 'la copia tiene los datos')
+    ok(copy.query('SELECT COUNT(*) n FROM Orders').get().n === db.query('SELECT COUNT(*) n FROM Orders').get().n, 'la copia tiene los mismos pedidos que la base')
     copy.close()
     ok((await c.get('/backups/..%2Ftest.db')).status === 404, 'traversal rechazado')
     ok((await c.get('/backups/otro.db')).status === 404, 'nombre ajeno rechazado')
