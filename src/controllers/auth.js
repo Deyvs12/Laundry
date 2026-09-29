@@ -2,6 +2,7 @@ import { setCookie, deleteCookie, getCookie } from 'hono/cookie'
 import * as users from '../services/users.js'
 import * as sessions from '../services/sessions.js'
 import * as logs from '../services/logs.js'
+import { DEFAULT_PASSWORD } from '../db/seed.js'
 import { loginPage, loginError } from '../views/login.js'
 
 const COOKIE_NAME = 'sid'
@@ -44,6 +45,9 @@ export async function login(c) {
   }
 
   const sid = sessions.create(user)
+  // Aquí tenemos la contraseña en claro, así que detectarlo es gratis: volver
+  // a hashear en cada petición solo para comprobarlo sería carísimo.
+  sessions.get(sid).usingDefaultPassword = password === DEFAULT_PASSWORD
   setCookie(c, COOKIE_NAME, sid, cookieOpts)
   logs.insert({
     userId: user.id,

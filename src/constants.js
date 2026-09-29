@@ -63,6 +63,7 @@ export const LOG_ACTIONS = [
   { value: 'ORDER_EDITED', label: 'Pedido editado' },
   { value: 'SHIFT_OPENED', label: 'Caja abierta' },
   { value: 'SHIFT_CLOSED', label: 'Caja cerrada' },
+  { value: 'USER_PASSWORD_CHANGED', label: 'Cambio de contraseña' },
   { value: 'USER_LOGIN', label: 'Inicio de sesión' },
   { value: 'USER_LOGOUT', label: 'Cierre de sesión' }
 ]

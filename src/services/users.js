@@ -24,3 +24,7 @@ export function create({ username, name, password, role }) {
     .run(username, name, password, role)
   return result.lastInsertRowid
 }
+
+export function updatePassword(id, passwordHash) {
+  db.query('UPDATE Users SET password = ? WHERE id = ?').run(passwordHash, id)
+}

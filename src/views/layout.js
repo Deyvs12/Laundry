@@ -12,11 +12,23 @@ export function layout({ title = 'Laundry', body = '', user = null, shift = null
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-800">
   ${user ? renderNav(user, shift) : ''}
+  ${user?.usingDefaultPassword ? defaultPasswordBanner() : ''}
   <main id="main" class="max-w-5xl mx-auto p-6">
     ${body}
   </main>
 </body>
 </html>`
+}
+
+// Mientras siga la contraseña de fábrica, cualquiera en la red local puede
+// entrar. El aviso no se puede cerrar: desaparece al cambiarla.
+function defaultPasswordBanner() {
+  return `<div class="bg-red-600 text-white text-sm">
+    <div class="max-w-5xl mx-auto px-6 py-2">
+      Estás usando la contraseña por defecto.
+      <a href="/account" class="underline font-semibold">Cámbiala ahora</a> antes de dejar el sistema en uso.
+    </div>
+  </div>`
 }
 
 function renderNav(user, shift) {
@@ -35,7 +47,7 @@ function renderNav(user, shift) {
         </a>
       </div>
       <div class="flex items-center gap-4 text-sm">
-        <span class="text-slate-600">${escapeHtml(user.name)} (${escapeHtml(user.role)})</span>
+        <a href="/account" class="text-slate-600 hover:text-slate-900">${escapeHtml(user.name)} (${escapeHtml(user.role)})</a>
         <button
           hx-post="/auth/logout"
           class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300">

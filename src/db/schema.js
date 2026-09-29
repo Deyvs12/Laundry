@@ -111,6 +111,7 @@ export const schema = `
       'ORDER_CANCELLED',
       'ORDER_REFUNDED',
       'ORDER_EDITED',
+      'USER_PASSWORD_CHANGED',
       'SHIFT_OPENED',
       'SHIFT_CLOSED',
       'USER_LOGIN',
@@ -122,4 +123,16 @@ export const schema = `
     FOREIGN KEY (order_id) REFERENCES Orders(id),
     FOREIGN KEY (cash_shift_id) REFERENCES Cash_shifts(id)
   );
+
+  -- SQLite indexa sola la clave primaria, pero NO las foráneas. Cada JOIN por
+  -- una FK sin índice es un recorrido completo de la tabla.
+  CREATE INDEX IF NOT EXISTS idx_order_services_order ON Order_services(id_orders);
+  CREATE INDEX IF NOT EXISTS idx_orders_client        ON Orders(id_client);
+  CREATE INDEX IF NOT EXISTS idx_orders_shift         ON Orders(cash_shift_id);
+  CREATE INDEX IF NOT EXISTS idx_orders_status        ON Orders(status);
+  CREATE INDEX IF NOT EXISTS idx_movements_order      ON Cash_movements(order_id);
+  CREATE INDEX IF NOT EXISTS idx_movements_shift      ON Cash_movements(cash_shift_id);
+  CREATE INDEX IF NOT EXISTS idx_logs_order           ON Logs(order_id);
+  CREATE INDEX IF NOT EXISTS idx_clients_name         ON Clients(name);
+  CREATE INDEX IF NOT EXISTS idx_services_type_name   ON Services(type, name);
 `

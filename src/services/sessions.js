@@ -39,6 +39,12 @@ export function destroy(sid) {
   sessions.delete(sid)
 }
 
+// Al cambiar la contraseña se cierran las demás sesiones, pero no la actual:
+// quien acaba de cambiarla no debería quedarse fuera.
+export function destroyOthers(keepSid) {
+  for (const sid of sessions.keys()) if (sid !== keepSid) sessions.delete(sid)
+}
+
 // Solo para pruebas: envejece una sesión.
 export function _setLastSeen(sid, ts) {
   const s = sessions.get(sid)

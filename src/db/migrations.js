@@ -97,6 +97,43 @@ function rebuildLogsV4(db) {
   db.exec('ALTER TABLE Logs_v4 RENAME TO Logs')
 }
 
+// DDL de Logs congelado en v5: añade USER_PASSWORD_CHANGED al CHECK.
+function rebuildLogsV5(db) {
+  db.exec(`
+    CREATE TABLE Logs_v5 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      order_id INTEGER,
+      cash_shift_id INTEGER,
+      action TEXT CHECK(action IN (
+        'ORDER_CREATED',
+        'ORDER_STATUS_CHANGED',
+        'ORDER_DISCOUNTED',
+        'ORDER_PAID',
+        'ORDER_CANCELLED',
+        'ORDER_REFUNDED',
+        'ORDER_EDITED',
+        'USER_PASSWORD_CHANGED',
+        'SHIFT_OPENED',
+        'SHIFT_CLOSED',
+        'USER_LOGIN',
+        'USER_LOGOUT'
+      )) NOT NULL,
+      message TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES Users(id),
+      FOREIGN KEY (order_id) REFERENCES Orders(id),
+      FOREIGN KEY (cash_shift_id) REFERENCES Cash_shifts(id)
+    )
+  `)
+  db.exec(`
+    INSERT INTO Logs_v5 (id, user_id, order_id, cash_shift_id, action, message, created_at)
+    SELECT id, user_id, order_id, cash_shift_id, action, message, created_at FROM Logs
+  `)
+  db.exec('DROP TABLE Logs')
+  db.exec('ALTER TABLE Logs_v5 RENAME TO Logs')
+}
+
 const migrations = [
   {
     version: 1,
@@ -172,6 +209,28 @@ const migrations = [
         FOREIGN KEY (user_id) REFERENCES Users(id)
       )`)
       if (!tableSql(db, 'Logs').includes('ORDER_REFUNDED')) rebuildLogsV4(db)
+    }
+  },
+  {
+    version: 5,
+    name: 'Índices de claves foráneas y Logs.USER_PASSWORD_CHANGED',
+    up(db) {
+      if (!tableSql(db, 'Logs').includes('USER_PASSWORD_CHANGED')) rebuildLogsV5(db)
+
+      // Se crean después del rebuild: el DROP de Logs se lleva sus índices.
+      for (const sql of [
+        'CREATE INDEX IF NOT EXISTS idx_order_services_order ON Order_services(id_orders)',
+        'CREATE INDEX IF NOT EXISTS idx_orders_client        ON Orders(id_client)',
+        'CREATE INDEX IF NOT EXISTS idx_orders_shift         ON Orders(cash_shift_id)',
+        'CREATE INDEX IF NOT EXISTS idx_orders_status        ON Orders(status)',
+        'CREATE INDEX IF NOT EXISTS idx_movements_order      ON Cash_movements(order_id)',
+        'CREATE INDEX IF NOT EXISTS idx_movements_shift      ON Cash_movements(cash_shift_id)',
+        'CREATE INDEX IF NOT EXISTS idx_logs_order           ON Logs(order_id)',
+        'CREATE INDEX IF NOT EXISTS idx_clients_name         ON Clients(name)',
+        'CREATE INDEX IF NOT EXISTS idx_services_type_name   ON Services(type, name)'
+      ]) {
+        db.exec(sql)
+      }
     }
   }
 ]
