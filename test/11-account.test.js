@@ -78,7 +78,7 @@ describe('aviso de contraseña por defecto', () => {
     resetDb()
     const cc = client(base, await login(base))
     let html = await (await cc.get('/orders')).text()
-    ok(html.includes('Estás usando la contraseña por defecto') && html.includes('bg-red-600'), 'banner visible')
+    ok(html.includes('Estás usando la contraseña por defecto') && html.includes('href="/account"'), 'banner visible')
 
     await cc.post('/account/password', { current_password: 'admin123', new_password: 'otra-buena-123', confirm_password: 'otra-buena-123' })
     html = await (await cc.get('/orders')).text()

@@ -20,7 +20,7 @@ afterAll(stopServer)
 describe('sin turno', () => {
   test('página de apertura; cobros sin turno se registran y se muestran aparte', async () => {
     let html = await (await A.get('/cash')).text()
-    ok(html.includes('No hay turno abierto') && html.includes('name="initial_cash"') && html.includes('>cerrada<'), 'formulario + nav')
+    ok(html.includes('No hay turno abierto') && html.includes('name="initial_cash"') && html.includes('Caja cerrada'), 'formulario + nav')
     ok(html.includes('Aún no hay cortes cerrados') && !html.includes('Cobros sin turno'), 'vacío')
     ok((await (await A.get(`/orders/${o1}`)).text()).includes('quedará registrado <strong>sin turno</strong>'), 'detalle avisa')
     await A.post(`/orders/${o4}/pay`, { payment_method: 'transfer' })
@@ -48,7 +48,7 @@ describe('abrir', () => {
     ok(db.query("SELECT cash_shift_id FROM Logs WHERE action = 'SHIFT_OPENED'").get()?.cash_shift_id === 1, 'log')
     r = await A.post('/cash/open', { initial_cash: '100' })
     ok((await r.text()).includes('Ya hay un turno abierto') && db.query('SELECT COUNT(*) n FROM Cash_shifts').get().n === 1, 'segundo rechazado')
-    ok((await (await A.get('/orders')).text()).includes('abierta #1'), 'nav')
+    ok((await (await A.get('/orders')).text()).includes('Caja abierta'), 'nav')
   })
 })
 

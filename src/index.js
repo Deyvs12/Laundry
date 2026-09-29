@@ -4,8 +4,7 @@ import { join } from 'node:path'
 import db from './db/database.js'
 import { seedAdmin } from './db/seed.js'
 import { requireAuth } from './middleware/auth.js'
-import { render } from './render.js'
-import { escapeHtml } from './views/_helpers.js'
+import { newPage } from './controllers/orders.js'
 import authRoutes from './routes/auth.js'
 import clientsRoutes from './routes/clients.js'
 import servicesRoutes from './routes/services.js'
@@ -36,15 +35,9 @@ app.route('/', reportsRoutes)
 app.route('/', logsRoutes)
 app.route('/', accountRoutes)
 
-app.get('/', (c) => {
-  const user = c.get('user')
-  const body = `
-    <h1 class="text-2xl font-semibold mb-4">Bienvenido, ${escapeHtml(user.name)}</h1>
-    <p class="text-slate-600 mb-4">Pedidos, clientes y catálogo de servicios disponibles.</p>
-    <a href="/orders/new" class="inline-block bg-slate-800 text-white px-4 py-2 rounded">Nuevo pedido</a>
-  `
-  return render(c, { title: 'Inicio — Laundry', body })
-})
+// La portada es la captura de pedidos: es lo que se hace cien veces al día, y
+// una pantalla de bienvenida solo añadiría un clic a cada pedido.
+app.get('/', newPage)
 
 export default {
   port: 3000,

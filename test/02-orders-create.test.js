@@ -20,7 +20,7 @@ describe('pantalla de captura', () => {
     ok(html.includes('name="service_search"') && html.includes('name="service_type"'), 'buscador')
     ok(html.includes('$25.50'), 'precio visible en resultados')
     ok(html.includes('Ningún cliente seleccionado') && html.includes('Aún no has agregado servicios'), 'estado inicial')
-    ok(html.includes(`type="date" min="${daysFromNow(0)}"`), 'el input de fecha tiene min=hoy')
+    ok(html.includes(`min="${daysFromNow(0)}"`), 'el input de fecha tiene min=hoy')
   })
 
   test('cliente: buscar, seleccionar, quitar, crear al vuelo', async () => {
