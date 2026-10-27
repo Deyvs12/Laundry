@@ -76,6 +76,65 @@ describe('barra de navegación', () => {
   })
 })
 
+describe('menos toques en la captura', () => {
+  test('el tipo de servicio son botones, no un desplegable', async () => {
+    const html = await (await c.get('/')).text()
+    ok(!html.includes('<select id="service_type"') && !html.includes('name="service_type" class="input"'), 'ya no es <select>')
+    ok(html.includes('role="radiogroup"') && (html.match(/name="service_type"/g) || []).length === 4, 'cuatro radios')
+    for (const label of ['Todos', 'Lavandería', 'Planchado', 'Tintorería']) {
+      ok(html.includes(`>${label}</label>`), `falta ${label}`)
+    }
+    // "Todos" es el único que arranca marcado.
+    const marcados = html.match(/<input type="radio"[^>]*name="service_type"[^>]*checked/g) || []
+    ok(marcados.length === 1 && marcados[0].includes('value=""'), '"Todos" viene marcado y es el único')
+    ok(/class="seg"[^>]*hx-trigger="change"[^>]*hx-get="\/orders\/new\/services"/.test(html), 'filtra al cambiar')
+  })
+
+  test('el filtro por botones sigue llegando al servidor', async () => {
+    await addService(c, 'Traje', 'dry_cleaning', '180', 'service')
+    const html = await (await c.get('/orders/new/services?service_type=dry_cleaning')).text()
+    ok(html.includes('Traje') && !html.includes('Lavado por kilo'), 'filtra por tipo')
+  })
+
+  test('sin coincidencias avisa y marca qué se tecleó', async () => {
+    await addClient(c, 'Rosa Pérez', '555-4321')
+
+    let html = await (await c.get('/orders/new/clients?client_search=555-0000')).text()
+    ok(html.includes('id="client-no-match"') && html.includes('Sin coincidencias'), 'avisa')
+    ok(html.includes('data-kind="phone"') && html.includes('data-term="555-0000"'), 'reconoce un teléfono')
+    ok(html.includes('este teléfono') && html.includes('Enter'), 'dice qué hace Enter')
+
+    html = await (await c.get('/orders/new/clients?client_search=Zulema')).text()
+    ok(html.includes('data-kind="name"') && html.includes('este nombre'), 'reconoce un nombre')
+  })
+
+  test('con coincidencias, la lista es enganchable para elegir la primera', async () => {
+    const html = await (await c.get('/orders/new/clients?client_search=Rosa')).text()
+    ok(html.includes('id="client-matches"') && !html.includes('client-no-match'), 'lista identificada')
+  })
+
+  test('la fecha de entrega tiene atajos y eco en español', async () => {
+    const html = await (await c.get('/')).text()
+    for (const label of ['Hoy', 'Mañana', 'En 2 días', 'En 3 días']) {
+      ok(html.includes(`>${label}</button>`), `falta el atajo ${label}`)
+    }
+    ok(html.includes('window.fijarEntrega(0)') && html.includes('window.fijarEntrega(3)'), 'atajos enganchados')
+    ok(html.includes('id="expected-echo"'), 'hueco para el eco')
+    // El calendario nativo sale en el idioma del navegador; el eco no depende
+    // de eso porque usa Intl, que trae los idiomas incorporados.
+    ok(html.includes("toLocaleDateString('es-MX'"), 'el eco se escribe en español')
+    ok(html.includes('hx-on:change="window.mostrarEntrega()"'), 'se actualiza al elegir en el calendario')
+  })
+
+  test('la página trae los atajos de teclado', async () => {
+    const html = await (await c.get('/')).text()
+    ok(html.includes('window.clienteEnter') && html.includes("event.key==='Enter'"), 'Enter en el buscador')
+    ok(html.includes('window.limpiarBusquedaCliente'), 'limpieza tras elegir')
+    ok(html.includes('id="new-client-submit"'), 'el alta se puede disparar con Enter')
+    ok(html.includes('new_client_phone') && html.includes('new_client_name'), 'campos del alta presentes para prellenar')
+  })
+})
+
 describe('componentes', () => {
   test('cada estado de pedido tiene su color', () => {
     const tone = (html) => html.match(/badge-(\w+)/)?.[1]

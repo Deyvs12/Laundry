@@ -152,6 +152,29 @@ export function selectField({
   `
 }
 
+// Control segmentado: sustituye a un <select> cuando hay pocas opciones y se
+// elige a menudo. Un toque en vez de dos, y la opción activa se ve sin abrir
+// nada. Son radios de verdad, así que el valor viaja solo en el hx-include.
+export function segmented({ name, options, selected = '', label = null, attrs = '', className = '' } = {}) {
+  return `
+    <div class="${className}">
+      ${label ? `<span class="label">${label}</span>` : ''}
+      <div class="seg" role="radiogroup"${label ? ` aria-label="${escapeHtml(label)}"` : ''} ${attrs}>
+        ${options
+          .map((o, i) => {
+            // Input y etiqueta como hermanos directos: así el selector
+            // :checked + .seg-option funciona sin trucos de maquetación.
+            const id = `${name}-${i}`
+            return `<input type="radio" id="${id}" name="${name}" value="${escapeHtml(o.value)}"
+                class="seg-input sr-only"${o.value === selected ? ' checked' : ''}
+              ><label for="${id}" class="seg-option">${escapeHtml(o.label)}</label>`
+          })
+          .join('')}
+      </div>
+    </div>
+  `
+}
+
 /* ============================ estados ============================ */
 
 export function badge(label, tone = 'neutral') {

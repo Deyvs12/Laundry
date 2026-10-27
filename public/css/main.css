@@ -159,6 +159,27 @@
     padding-block: 0.625rem;
   }
 
+  /* Control segmentado: un toque por opción, en lugar de abrir un desplegable.
+     Se arma con radios nativos ocultos, así conserva el estado y el teclado
+     funciona solo. El estilo va en el <span> hermano del input marcado. */
+  .seg {
+    @apply flex flex-wrap gap-1 p-1 rounded-lg bg-slate-100;
+  }
+  .seg-option {
+    @apply flex-1 flex items-center justify-center text-center cursor-pointer select-none
+           rounded-md px-3 text-sm font-medium text-slate-600 transition-colors
+           hover:text-slate-900;
+    min-height: var(--spacing-touch);
+    min-width: 5.5rem;
+  }
+  .seg-input:checked + .seg-option {
+    @apply bg-white text-brand-700 shadow-sm;
+  }
+  .seg-input:focus-visible + .seg-option {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+
   /* Tabla de datos estándar. */
   .table {
     @apply w-full text-sm;

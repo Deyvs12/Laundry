@@ -1,6 +1,6 @@
 import { escapeHtml, formatMoney, todayLocal } from '../_helpers.js'
 import { SERVICE_TYPES, quantityUnit, priceTypeLabel, serviceTypeLabel } from '../../constants.js'
-import { card, btn, field, selectField, icon, alert, emptyState, pageHeader } from '../components.js'
+import { card, btn, field, selectField, segmented, icon, alert, emptyState, pageHeader } from '../components.js'
 
 // La pantalla completa es un <div>, no un <form>. Con hx-include el botón de
 // guardar recoge igual todos los campos, y a cambio evitamos dos problemas:
@@ -56,6 +56,8 @@ export function orderNewPage(initialServices, staff, { order = null, lines = [],
       </div>
 
     </div>
+
+    ${clientScript()}
   `
 }
 
@@ -77,30 +79,142 @@ function clientCard(client) {
         hx-trigger="input changed delay:300ms"
         hx-target="#client-results"
         hx-swap="innerHTML"
+        hx-on:keydown="if(event.key==='Enter'){event.preventDefault();window.clienteEnter()}"
         class="input pl-10">
     </div>
 
-    <div id="client-results" class="mt-2"></div>
+    <div id="client-results" class="mt-2" hx-on::after-request="window.limpiarBusquedaCliente()"></div>
 
     ${clientBox(client)}
 
-    <details id="new-client" class="mt-4 pt-4 border-t border-slate-200 group">
-      <summary class="flex items-center gap-2 text-sm font-medium text-brand-700 cursor-pointer list-none select-none">
+    <details id="new-client" class="mt-4 pt-4 border-t border-slate-200">
+      <summary class="flex items-center gap-2 text-sm font-medium text-brand-700 cursor-pointer list-none select-none py-1">
         ${icon('plus', 'w-4 h-4')} ¿Cliente nuevo?
       </summary>
-      <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mt-3">
+      <div class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mt-3"
+        hx-on:keydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('new-client-submit').click()}">
         <input name="new_client_name" type="text" placeholder="Nombre" class="input">
         <input name="new_client_phone" type="text" placeholder="Teléfono" class="input">
         ${btn({
           label: 'Crear y usar',
           variant: 'secondary',
           attrs:
-            'hx-post="/orders/new/clients" hx-include="#new-client" hx-target="#client-box" hx-swap="outerHTML"'
+            'id="new-client-submit" hx-post="/orders/new/clients" hx-include="#new-client" hx-target="#client-box" hx-swap="outerHTML" hx-on::after-request="window.limpiarBusquedaCliente()"'
         })}
       </div>
     </details>
   `
   return card({ title: '1. Cliente', body })
+}
+
+// El calendario de <input type="date"> es nativo: sale en el idioma del
+// navegador o del sistema, e ignora el lang="es" de la página. En un equipo con
+// locale en inglés eso significa nombres en inglés y, peor, formato MM/DD, que
+// para una fecha como 05/09 es ambiguo y se puede leer al revés.
+//
+// Se resuelve sin depender de la configuración del equipo:
+//   - Atajos para los casos habituales, que evitan abrir el calendario.
+//   - Un eco de la fecha elegida escrito en español, que quita toda duda.
+// El eco usa Intl del navegador, que trae todos los idiomas incorporados y no
+// depende de los locales instalados en el sistema.
+const DELIVERY_SHORTCUTS = [
+  ['Hoy', 0],
+  ['Mañana', 1],
+  ['En 2 días', 2],
+  ['En 3 días', 3]
+]
+
+function deliveryField({ value, minDate }) {
+  return `
+    <div>
+      <label class="label" for="expected">Entrega estimada</label>
+
+      <div class="flex flex-wrap gap-1.5 mb-2">
+        ${DELIVERY_SHORTCUTS.map(
+          ([label, days]) =>
+            `<button type="button" class="btn btn-secondary btn-sm"
+              hx-on:click="window.fijarEntrega(${days})">${label}</button>`
+        ).join('')}
+      </div>
+
+      <input id="expected" name="expected_delivery_date" type="date"
+        min="${minDate}" value="${escapeHtml(value)}"
+        class="input" hx-on:change="window.mostrarEntrega()">
+
+      <p id="expected-echo" class="hint empty:hidden"></p>
+    </div>
+  `
+}
+
+// Atajos de teclado del buscador de clientes. Cada uno ahorra un toque en el
+// mostrador, que es donde se nota.
+function clientScript() {
+  return `<script>
+    // Enter en el buscador: si hay resultados, elige el primero. Si no hay
+    // ninguno, abre el alta con lo tecleado ya puesto en el campo que toca.
+    window.clienteEnter = function () {
+      var primero = document.querySelector('#client-matches button')
+      if (primero) { primero.click(); return }
+
+      var aviso = document.getElementById('client-no-match')
+      if (!aviso) return
+
+      var alta = document.getElementById('new-client')
+      alta.open = true
+
+      var esTelefono = aviso.dataset.kind === 'phone'
+      var puesto = esTelefono ? 'new_client_phone' : 'new_client_name'
+      var falta  = esTelefono ? 'new_client_name'  : 'new_client_phone'
+      alta.querySelector('[name=' + puesto + ']').value = aviso.dataset.term
+      alta.querySelector('[name=' + falta + ']').focus()
+    }
+
+    // Con el cliente ya elegido, la búsqueda y el alta sobran en pantalla.
+    // Si la petición falló, no hay hidden id_client y no se toca nada.
+    window.limpiarBusquedaCliente = function () {
+      if (!document.querySelector('#client-box input[name=id_client]')) return
+
+      var buscador = document.getElementById('client-search')
+      if (buscador) buscador.value = ''
+
+      var resultados = document.getElementById('client-results')
+      if (resultados) resultados.innerHTML = ''
+
+      var alta = document.getElementById('new-client')
+      if (alta) {
+        alta.open = false
+        alta.querySelectorAll('input').forEach(function (i) { i.value = '' })
+      }
+    }
+
+    // Fecha de entrega a N días de hoy, sin abrir el calendario.
+    window.fijarEntrega = function (dias) {
+      var d = new Date()
+      d.setDate(d.getDate() + dias)
+      var p = function (n) { return String(n).padStart(2, '0') }
+      document.getElementById('expected').value =
+        d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+      window.mostrarEntrega()
+    }
+
+    // Escribe la fecha elegida en español bajo el campo.
+    window.mostrarEntrega = function () {
+      var input = document.getElementById('expected')
+      var eco = document.getElementById('expected-echo')
+      if (!input || !eco) return
+      if (!input.value) { eco.textContent = ''; return }
+
+      // Con componentes locales: new Date('2026-09-30') se interpreta en UTC y
+      // en México mostraría el día anterior.
+      var t = input.value.split('-')
+      var d = new Date(Number(t[0]), Number(t[1]) - 1, Number(t[2]))
+      eco.textContent = d.toLocaleDateString('es-MX', {
+        weekday: 'long', day: 'numeric', month: 'long'
+      })
+    }
+
+    window.mostrarEntrega()
+  </script>`
 }
 
 // Lleva el hidden id_client. Si no hay cliente elegido, va vacío y el servidor
@@ -135,14 +249,26 @@ export function clientBox(client, { error = null } = {}) {
   </div>`
 }
 
+// Un texto de solo dígitos y separadores se trata como teléfono. El dato viaja
+// en data-kind para que el guion de Enter no tenga que volver a adivinarlo.
+const looksLikePhone = (term) => /^[\d\s()+-]{3,}$/.test(term)
+
 export function clientResults(clients, term) {
   if (!term) return ''
 
   if (clients.length === 0) {
-    return `<p class="text-sm text-slate-500 px-1 py-2">Sin coincidencias para "${escapeHtml(term)}".</p>`
+    const kind = looksLikePhone(term) ? 'phone' : 'name'
+    return `<div id="client-no-match" data-kind="${kind}" data-term="${escapeHtml(term)}"
+      class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm">
+      <p class="text-amber-900">Sin coincidencias para "${escapeHtml(term)}".</p>
+      <p class="text-amber-800 mt-0.5">
+        Pulsa <kbd class="px-1.5 py-0.5 rounded border border-amber-300 bg-white text-xs font-semibold">Enter</kbd>
+        para darlo de alta con ${kind === 'phone' ? 'este teléfono' : 'este nombre'}.
+      </p>
+    </div>`
   }
 
-  return `<ul class="rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+  return `<ul id="client-matches" class="rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
     ${clients
       .map(
         (c) => `<li>
@@ -182,29 +308,29 @@ function servicePicker({ rows, total }) {
 
   return `
     <div id="service-picker">
-      <div class="grid grid-cols-2 sm:grid-cols-[1fr_1fr_7rem] gap-2">
-        ${selectField({
-          label: 'Tipo',
-          name: 'service_type',
-          options: SERVICE_TYPES,
-          placeholder: 'Todos',
-          attrs: hx,
-          className: 'col-span-1'
-        })}
+      ${segmented({
+        name: 'service_type',
+        label: 'Tipo de servicio',
+        options: [{ value: '', label: 'Todos' }, ...SERVICE_TYPES],
+        selected: '',
+        // El evento change de los radios burbujea hasta este contenedor.
+        attrs: `hx-trigger="change" ${hx}`,
+        className: 'mb-3'
+      })}
+
+      <div class="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
         ${field({
           label: 'Buscar',
           name: 'service_search',
           placeholder: 'Nombre del servicio…',
-          attrs: `autocomplete="off" hx-trigger="input changed delay:250ms" ${hx}`,
-          className: 'col-span-1'
+          attrs: `autocomplete="off" hx-trigger="input changed delay:250ms" ${hx}`
         })}
         ${field({
           label: 'Cantidad',
           name: 'pick_quantity',
           id: 'pick-quantity',
           value: '1',
-          inputmode: 'decimal',
-          className: 'col-span-2 sm:col-span-1'
+          inputmode: 'decimal'
         })}
       </div>
 
@@ -286,14 +412,7 @@ function ticketCard({ lines, totals, discount, staff, editing, order, minDate })
     </div>
 
     <div class="border-t border-slate-200 px-4 sm:px-5 py-4 space-y-4">
-      ${field({
-        label: 'Entrega estimada',
-        name: 'expected_delivery_date',
-        id: 'expected',
-        type: 'date',
-        value: editing ? order.expected_delivery_date || '' : '',
-        attrs: `min="${minDate}"`
-      })}
+      ${deliveryField({ value: editing ? order.expected_delivery_date || '' : '', minDate })}
 
       ${staffPicker(staff, editing ? String(order.id_staff ?? '') : '')}
 
