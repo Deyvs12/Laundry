@@ -65,6 +65,7 @@ src/
 ├── services/         acceso a datos y reglas de negocio
 ├── views/            plantillas HTML (fragmentos para HTMX)
 ├── middleware/       autenticación
+├── printer/          tickets: PC850, ESC/POS, 32 columnas y cola de impresión
 └── db/
     ├── database.js   conexión, PRAGMA y arranque de migraciones
     ├── schema.js     forma actual de las tablas (para bases nuevas)
@@ -96,12 +97,103 @@ Los archivos van a `backups/` y se pueden descargar desde la misma pantalla.
 Conviene copiar uno a una memoria USB cada tanto: un respaldo en el mismo disco
 que la base no protege contra una falla del disco.
 
+## Impresora de tickets
+
+Térmica **SNBC BTP-R356H**, de 58 mm y conectada por USB. Linux la maneja con
+el driver `usblp` del kernel, sin CUPS ni drivers adicionales. El sistema le
+escribe ESC/POS directamente al dispositivo.
+
+La instalación en la computadora del cliente se hace una sola vez, en tres
+pasos.
+
+### 1. Poner la impresora en modo clase (una vez, desde Windows)
+
+De fábrica viene en *API Mode* (USB `154f:154f`, clase 255). En ese modo Linux
+no la reconoce como impresora y no aparece ningún `/dev/usb/lp*`.
+
+Se cambia con **BarPrnTest** de SNBC: *Herramientas → Configuración del
+dispositivo → Modo USB: API → Clase*. El ajuste se queda guardado en la
+impresora. Después debe aparecer como `154f:1300`:
+
+```bash
+lsusb | grep 154f        # debe decir 154f:1300
+```
+
+### 2. Regla udev para un nombre fijo
+
+El kernel la crea como `/dev/usb/lp0`, `lp1`, etc., y ese número puede cambiar
+entre reinicios o si se conecta otra impresora. La regla le da siempre el mismo
+nombre, `/dev/ticketera`:
+
+```bash
+sudo tee /etc/udev/rules.d/99-ticketera.rules > /dev/null <<'EOF'
+SUBSYSTEM=="usbmisc", KERNEL=="lp*", SUBSYSTEMS=="usb", ATTRS{idVendor}=="154f", ATTRS{idProduct}=="1300", GROUP="lp", MODE="0660", SYMLINK+="ticketera"
+EOF
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+Para comprobarla, con la impresora conectada y encendida:
+
+```bash
+ls -l /dev/ticketera     # enlace a usb/lp0 (o lpN)
+ls -l /dev/usb/lp*       # dueño root:lp, permisos crw-rw----
+```
+
+La regla sigue funcionando si se apaga y se enciende la impresora (probado).
+
+### 3. Permiso para el usuario que corre el servidor
+
+El dispositivo pertenece al grupo `lp`. Si el usuario que ejecuta el servidor
+no está en ese grupo, imprimir falla con *permiso denegado*:
+
+```bash
+sudo usermod -aG lp "$USER"
+```
+
+El grupo nuevo solo lo reciben los procesos que arrancan después del cambio.
+**Hay que reiniciar la computadora.** Cerrar sesión y volver a entrar no siempre
+basta: el administrador de sesión del usuario (`systemd --user`) puede seguir
+vivo, y los programas que lanza, como el editor o la terminal, heredan los
+grupos viejos.
+
+Para comprobarlo, en una terminal nueva:
+
+```bash
+id -nG                   # tiene que aparecer lp
+```
+
+Si `/etc/group` ya lo incluye (`getent group lp`) pero `id` no, el proceso
+viene de antes del cambio. Mientras tanto se puede probar con
+`sg lp -c "bun run scripts/print-test.js"`.
+
+### Comprobar que imprime
+
+Desde la terminal, sin levantar el servidor:
+
+```bash
+bun run scripts/print-test.js
+```
+
+O desde la aplicación, en `/printer` (no aparece en la barra; se teclea la
+dirección). Las dos opciones imprimen el mismo ticket de prueba: acentos, una
+regla de 32 columnas y renglones con precio. Si falta algún carácter, o se
+pierde el que va después de una ñ o una ¿, la secuencia de inicio no está
+llegando a la impresora (ver `src/printer/escpos.js`).
+
+Si algo falla, el mensaje dice la causa: impresora no encontrada (desconectada
+o apagada), sin permiso (paso 3), ocupada por otro programa, o sin respuesta
+(sin papel o con la tapa abierta). Una impresión nunca deja colgado el
+sistema: después de 10 segundos sin respuesta se cancela.
+
 ## Variables de entorno
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `LAVANDERIA_DB` | `lavanderia.db` en la raíz | Apuntar a otra base (pruebas, restaurar un respaldo) |
 | `LAVANDERIA_BACKUPS` | `backups/` junto a la base | Cambiar la carpeta de respaldos |
+| `LAVANDERIA_TICKETERA` | `/dev/ticketera` | Dispositivo de la impresora de tickets |
 | `SESSION_HOURS` | `8` | Horas de inactividad antes de cerrar la sesión |
 | `TZ` | la zona del sistema | Zona horaria del negocio |
 
