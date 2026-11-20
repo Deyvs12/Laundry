@@ -9,7 +9,7 @@ import { encode, normalize } from '../src/printer/cp850.js'
 import { COLS, wrap, row, rule } from '../src/printer/columns.js'
 import { Ticket, INIT, FEED_LINES } from '../src/printer/escpos.js'
 import { print, PrinterError } from '../src/printer/device.js'
-import { testTicket } from '../src/printer/test-ticket.js'
+import { testTicket, commandsTestTicket } from '../src/printer/test-ticket.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'ticketera-'))
 const fresh = (name) => {
@@ -106,6 +106,45 @@ describe('ESC/POS', () => {
   })
 })
 
+describe('ESC/POS en prueba: tamaño y código de barras', () => {
+  const body = (t) => [...t.build().slice(INIT.length, -FEED_LINES)]
+
+  test('size() arma GS ! con ancho en el nibble alto y alto en el bajo', () => {
+    ok(body(new Ticket().size(2, 1)).join() === [0x1d, 0x21, 0x10].join(), 'doble ancho')
+    ok(body(new Ticket().size(1, 2)).join() === [0x1d, 0x21, 0x01].join(), 'doble alto')
+    ok(body(new Ticket().size(3, 3)).join() === [0x1d, 0x21, 0x22].join(), 'triple')
+    ok(body(new Ticket().size()).join() === [0x1d, 0x21, 0x00].join(), 'normal')
+    let threw = false
+    try { new Ticket().size(9, 1) } catch { threw = true }
+    ok(threw, 'fuera de rango')
+  })
+
+  test('CODE128: GS w, GS h, GS H y GS k 73 con el prefijo {B', () => {
+    const b = body(new Ticket().barcode('P123', { width: 3, height: 80 }))
+    const expected = [0x1d, 0x77, 3, 0x1d, 0x68, 80, 0x1d, 0x48, 2, 0x1d, 0x6b, 73, 6, ...Buffer.from('{BP123')]
+    ok(b.join() === expected.join(), b.join())
+  })
+
+  test('CODE39: GS k 69 sin prefijo', () => {
+    const b = body(new Ticket().barcode('P123', { type: 'CODE39' }))
+    ok(b.slice(9).join() === [0x1d, 0x6b, 69, 4, ...Buffer.from('P123')].join(), b.join())
+  })
+
+  test('rechaza lo que el código no puede representar', () => {
+    const fails = (fn) => { try { fn(); return false } catch { return true } }
+    ok(fails(() => new Ticket().barcode('p123', { type: 'CODE39' })), 'CODE39 sin minúsculas')
+    ok(fails(() => new Ticket().barcode('Niño')), 'CODE128 solo ASCII')
+    ok(fails(() => new Ticket().barcode('P1', { type: 'QR' })), 'tipo desconocido')
+    ok(fails(() => new Ticket().barcode('P1', { width: 7 })), 'grosor')
+  })
+
+  test('el ticket de prueba de comandos se arma completo', () => {
+    const b = commandsTestTicket(new Date(2026, 10, 18, 10, 30))
+    const n = (m) => b.reduce((acc, x, i) => acc + (x === 0x1d && b[i + 1] === 0x6b && b[i + 2] === m ? 1 : 0), 0)
+    ok(n(73) === 3 && n(69) === 3, `3 CODE128 y 3 CODE39 (hay ${n(73)} y ${n(69)})`)
+  })
+})
+
 describe('dispositivo', () => {
   test('escribe el ticket completo', async () => {
     const p = fresh('uno')
@@ -199,6 +238,14 @@ describe('/printer', () => {
     const r = await c.post('/printer/test')
     const html = await r.text()
     ok(r.status === 200 && html.includes('No se imprimió') && html.includes('No se encontró la impresora'), html)
+  })
+
+  test('prueba de comandos: imprime y avisa', async () => {
+    const p = fresh('http-comandos')
+    process.env.LAVANDERIA_TICKETERA = p
+    const r = await c.post('/printer/test-commands')
+    ok((await r.text()).includes('Ticket enviado'), 'éxito')
+    ok(bytesOf(p).length > 0, 'llegaron los bytes')
   })
 
   test('requiere sesión', async () => {

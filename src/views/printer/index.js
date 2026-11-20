@@ -28,6 +28,29 @@ export function printerPage({ path }) {
         <div id="printer-result" aria-live="polite"></div>
       `
     })}
+
+    ${card({
+      title: 'Tamaños de letra y códigos de barras',
+      className: 'mt-5',
+      body: `
+        <p class="text-sm text-slate-600 mb-4">
+          Comandos que todavía no se han probado en esta impresora: letra al doble
+          y al triple, y el folio en código de barras CODE128 y CODE39. Cada bloque
+          dice qué debería verse. Los códigos se pueden comprobar con la cámara de
+          un teléfono si no hay lector a la mano.
+        </p>
+        <div class="mb-4">
+          ${btn({
+            label: 'Imprimir prueba de comandos',
+            iconName: 'check',
+            size: 'lg',
+            variant: 'secondary',
+            attrs: 'hx-post="/printer/test-commands" hx-target="#printer-commands-result" hx-disabled-elt="this"'
+          })}
+        </div>
+        <div id="printer-commands-result" aria-live="polite"></div>
+      `
+    })}
   `
 }
 

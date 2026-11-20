@@ -1,12 +1,14 @@
 // Construcción de tickets en ESC/POS para la SNBC BTP-R356H.
 //
-// Solo están los comandos probados a mano en esta impresora. GS ! (tamaño de
-// letra) y GS k (código de barras) existen en el manual, pero no se han
-// probado y no se usan todavía.
+// INIT, ESC a (alineación) y ESC E (negritas) están probados en papel.
+// GS ! (tamaño) y GS k (código de barras) están EN PRUEBA: el ticket de
+// /printer "Tamaños y códigos de barras" los ejercita. No se usan en tickets
+// reales hasta confirmarlos.
 import { encode } from './cp850.js'
 
 const ESC = 0x1b
 const FS = 0x1c
+const GS = 0x1d
 
 // Va al principio de CADA ticket, en este orden:
 //   ESC @    reinicia la impresora (alineación, negritas, etc.)
@@ -23,6 +25,17 @@ export const FEED_LINES = 5
 
 const LF = 0x0a
 const ALIGN = { left: 0, center: 1, right: 2 }
+
+// m del formato "B" de GS k.
+//   CODE39: mayúsculas, dígitos, espacio y - . $ / + %. Más ancho, pero lo lee
+//           cualquier lector.
+//   CODE128: cualquier ASCII imprimible, más compacto. "{B" le dice a la
+//           impresora qué juego de caracteres usar; no aparece en el código
+//           leído.
+const BARCODES = {
+  CODE39: { m: 69, prefix: '', valid: /^[0-9A-Z \-.$/+%]{1,40}$/ },
+  CODE128: { m: 73, prefix: '{B', valid: /^[\x20-\x7e]{1,40}$/ }
+}
 
 export class Ticket {
   #parts = [INIT]
@@ -51,6 +64,40 @@ export class Ticket {
 
   feed(n = 1) {
     this.#parts.push(new Uint8Array(n).fill(LF))
+    return this
+  }
+
+  // GS ! n: multiplica el ancho y el alto de la letra (1 a 8 cada uno). A
+  // doble ancho caben 16 columnas en vez de 32. size() sin argumentos vuelve
+  // al tamaño normal.
+  size(width = 1, height = 1) {
+    for (const v of [width, height]) {
+      if (!Number.isInteger(v) || v < 1 || v > 8) throw new Error(`Tamaño fuera de rango: ${v}`)
+    }
+    this.#parts.push(Uint8Array.of(GS, 0x21, ((width - 1) << 4) | (height - 1)))
+    return this
+  }
+
+  // Código de barras, centrado o no según la alineación actual.
+  //   width   GS w: grosor de la barra más delgada, en puntos (2 a 6)
+  //   height  GS h: alto en puntos (203 dpi: 80 puntos ≈ 1 cm)
+  //   text    GS H: el contenido en texto legible debajo del código
+  barcode(data, { type = 'CODE128', width = 2, height = 80, text = true } = {}) {
+    const symbology = BARCODES[type]
+    if (!symbology) throw new Error(`Código de barras no soportado: ${type}`)
+    if (!symbology.valid.test(data)) throw new Error(`"${data}" no se puede codificar en ${type}`)
+    if (!Number.isInteger(width) || width < 2 || width > 6) throw new Error(`Grosor fuera de rango: ${width}`)
+    if (!Number.isInteger(height) || height < 1 || height > 255) throw new Error(`Alto fuera de rango: ${height}`)
+
+    // Formato "B" de GS k: GS k m n datos, con n = número de bytes.
+    const payload = new TextEncoder().encode(symbology.prefix + data)
+    this.#parts.push(
+      Uint8Array.of(GS, 0x77, width),
+      Uint8Array.of(GS, 0x68, height),
+      Uint8Array.of(GS, 0x48, text ? 2 : 0),
+      Uint8Array.of(GS, 0x6b, symbology.m, payload.length),
+      payload
+    )
     return this
   }
 

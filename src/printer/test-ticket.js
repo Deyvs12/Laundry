@@ -42,3 +42,55 @@ export function testTicket(now = new Date()) {
     .line('Fin de la prueba')
     .build()
 }
+
+// Fase 0: tamaños de letra y códigos de barras, todavía sin confirmar en esta
+// impresora. Cada bloque dice qué debería verse, para compararlo en el papel.
+export function commandsTestTicket(now = new Date()) {
+  const when = now.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
+  const t = new Ticket()
+    .align('center')
+    .bold()
+    .line('PRUEBA: TAMAÑOS Y CÓDIGOS')
+    .bold(false)
+    .line(when)
+    .align('left')
+    .line(rule())
+
+    // GS !: si no lo reconoce, todo sale del tamaño normal.
+    .line('Tamaño normal:')
+    .line('Folio P123')
+    .line('Doble alto:')
+    .size(1, 2).line('Folio P123').size()
+    .line('Doble ancho:')
+    .size(2, 1).line('Folio P123').size()
+    .line('Doble alto y ancho:')
+    .size(2, 2).line('Folio P123').size()
+    .line('Triple alto y ancho:')
+    .size(3, 3).line('P123').size()
+    .line('Doble ancho = 16 columnas:')
+    .size(2, 1).line('1234567890123456').size()
+    .line(rule())
+
+  // GS k: cada código lleva su descripción arriba y el texto legible abajo.
+  // P12345 es para ver si un folio largo sigue cabiendo en 58 mm.
+  const codes = [
+    ['CODE128, grosor 2', 'P123', 'CODE128', 2],
+    ['CODE128, grosor 3', 'P123', 'CODE128', 3],
+    ['CODE128, grosor 3, folio largo', 'P12345', 'CODE128', 3],
+    ['CODE39, grosor 2', 'P123', 'CODE39', 2],
+    ['CODE39, grosor 3', 'P123', 'CODE39', 3],
+    ['CODE39, grosor 2, folio largo', 'P12345', 'CODE39', 2]
+  ]
+  for (const [label, data, type, width] of codes) {
+    t.align('left').line(label + ':').align('center').barcode(data, { type, width, height: 80 }).feed(1)
+  }
+
+  return t
+    .align('left')
+    .line(rule())
+    .lines(wrap('Si después de un código no aparece texto, o el resto del ticket sale raro, ese comando no lo reconoce la impresora.'))
+    .line()
+    .align('center')
+    .line('Fin de la prueba')
+    .build()
+}
