@@ -51,7 +51,10 @@ export function row(left, right, width = COLS) {
   const room = width - rLen - 1
   if (room < 1) return [...wrap(left, width), ...wrap(r, width).map((l) => padStart(l, width))]
 
-  const lines = wrap(left, room)
+  // Una sangría al inicio del concepto se respeta en todos sus renglones:
+  // wrap() la descartaría al partir por espacios.
+  const indent = normalize(left).match(/^ */)[0].slice(0, Math.max(0, room - 1))
+  const lines = wrap(left, room - indent.length).map((l) => indent + l)
   const last = lines.pop()
   return [...lines, padEnd(last, width - rLen) + r]
 }

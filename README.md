@@ -168,6 +168,26 @@ Si `/etc/group` ya lo incluye (`getent group lp`) pero `id` no, el proceso
 viene de antes del cambio. Mientras tanto se puede probar con
 `sg lp -c "bun run scripts/print-test.js"`.
 
+### 4. Datos del negocio en los tickets
+
+El encabezado y el pie de cada ticket salen de un archivo `.env` en la raíz
+del proyecto. Bun lo lee solo al arrancar y no se sube a git.
+
+```bash
+LAVANDERIA_NEGOCIO="Lavandería La Burbuja"
+LAVANDERIA_DIRECCION="Av. Juárez 123|Col. Centro, Chihuahua"
+LAVANDERIA_TELEFONO="614 123 4567"
+LAVANDERIA_PIE_TICKET="¡Gracias por su preferencia!|Sin ticket no se entrega ropa"
+```
+
+En dirección y pie, `|` separa renglones. Una variable vacía simplemente no se
+imprime. Los cambios se aplican al reiniciar el servidor. En `/printer` se ve
+lo que va a salir y se avisa si falta algún dato.
+
+Ojo: Bun busca el `.env` en la carpeta desde donde se arranca. Si algún día
+corre como servicio de systemd, conviene apuntarlo explícitamente con
+`EnvironmentFile=/ruta/al/proyecto/.env`.
+
 ### Comprobar que imprime
 
 Desde la terminal, sin levantar el servidor:
@@ -194,6 +214,7 @@ sistema: después de 10 segundos sin respuesta se cancela.
 | `LAVANDERIA_DB` | `lavanderia.db` en la raíz | Apuntar a otra base (pruebas, restaurar un respaldo) |
 | `LAVANDERIA_BACKUPS` | `backups/` junto a la base | Cambiar la carpeta de respaldos |
 | `LAVANDERIA_TICKETERA` | `/dev/ticketera` | Dispositivo de la impresora de tickets |
+| `LAVANDERIA_NEGOCIO`, `LAVANDERIA_DIRECCION`, `LAVANDERIA_TELEFONO`, `LAVANDERIA_PIE_TICKET` | vacías | Encabezado y pie de los tickets (ver *Impresora de tickets*, paso 4) |
 | `SESSION_HOURS` | `8` | Horas de inactividad antes de cerrar la sesión |
 | `TZ` | la zona del sistema | Zona horaria del negocio |
 

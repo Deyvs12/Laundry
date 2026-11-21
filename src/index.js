@@ -15,6 +15,7 @@ import reportsRoutes from './routes/reports.js'
 import logsRoutes from './routes/logs.js'
 import accountRoutes from './routes/account.js'
 import printerRoutes from './routes/printer.js'
+import printJobsRoutes from './routes/print_jobs.js'
 
 await seedAdmin()
 
@@ -36,6 +37,7 @@ app.route('/', reportsRoutes)
 app.route('/', logsRoutes)
 app.route('/', accountRoutes)
 app.route('/', printerRoutes)
+app.route('/', printJobsRoutes)
 
 // La portada es la captura de pedidos: es lo que se hace cien veces al día, y
 // una pantalla de bienvenida solo añadiría un clic a cada pedido.

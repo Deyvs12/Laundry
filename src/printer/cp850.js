@@ -67,3 +67,10 @@ export function encode(text) {
   })
   return bytes
 }
+
+// El camino inverso, para leer lo que se mandó a la impresora (preview.js).
+export function decode(bytes) {
+  let out = ''
+  for (const b of bytes) out += b < 0x80 ? String.fromCharCode(b) : HIGH[b - 0x80]
+  return out
+}

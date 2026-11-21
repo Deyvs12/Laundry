@@ -1,10 +1,11 @@
 import { print, devicePath, PrinterError } from '../printer/device.js'
 import { testTicket, commandsTestTicket } from '../printer/test-ticket.js'
+import { business, missingBusinessVars } from '../printer/business.js'
 import { render } from '../render.js'
 import { printerPage, printResult } from '../views/printer/index.js'
 
 export function index(c) {
-  return render(c, { title: 'Impresora — Laundry', body: printerPage({ path: devicePath() }) })
+  return render(c, { title: 'Impresora — Laundry', body: printerPage({ path: devicePath(), business: business(), missing: missingBusinessVars() }) })
 }
 
 // Siempre responde 200: HTMX no pinta las respuestas con código de error, y el

@@ -1,9 +1,9 @@
 // Construcción de tickets en ESC/POS para la SNBC BTP-R356H.
 //
-// INIT, ESC a (alineación) y ESC E (negritas) están probados en papel.
-// GS ! (tamaño) y GS k (código de barras) están EN PRUEBA: el ticket de
-// /printer "Tamaños y códigos de barras" los ejercita. No se usan en tickets
-// reales hasta confirmarlos.
+// Todos los comandos de este archivo están probados en papel en esa impresora:
+// INIT, ESC a (alineación) y ESC E (negritas) el 2026-11-18; GS ! (tamaño) y
+// GS k (CODE128 y CODE39, leídos con lector) el 2026-11-19. Un comando nuevo
+// se prueba primero en el ticket de /printer antes de usarlo en un ticket real.
 import { encode } from './cp850.js'
 
 const ESC = 0x1b

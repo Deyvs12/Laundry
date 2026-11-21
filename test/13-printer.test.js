@@ -106,7 +106,7 @@ describe('ESC/POS', () => {
   })
 })
 
-describe('ESC/POS en prueba: tamaño y código de barras', () => {
+describe('ESC/POS: tamaño y código de barras', () => {
   const body = (t) => [...t.build().slice(INIT.length, -FEED_LINES)]
 
   test('size() arma GS ! con ancho en el nibble alto y alto en el bajo', () => {

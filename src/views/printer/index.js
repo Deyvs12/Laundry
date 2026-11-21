@@ -1,15 +1,18 @@
 import { escapeHtml } from '../_helpers.js'
-import { alert, btn, card, pageHeader } from '../components.js'
+import { alert, btn, card, dataRow, pageHeader } from '../components.js'
 
-export function printerPage({ path }) {
+export function printerPage({ path, business, missing = [] }) {
   return `
     ${pageHeader({
       title: 'Impresora de tickets',
-      subtitle: 'Prueba de conexión con la ticketera.'
+      subtitle: 'Datos de los tickets y pruebas de la ticketera.'
     })}
+
+    ${businessCard(business, missing)}
 
     ${card({
       title: 'Ticket de prueba',
+      className: 'mt-5',
       body: `
         <p class="text-sm text-slate-600 mb-4">
           Dispositivo: <code>${escapeHtml(path)}</code>.
@@ -52,6 +55,30 @@ export function printerPage({ path }) {
       `
     })}
   `
+}
+
+// Lo que va a salir en el encabezado y el pie de cada ticket. Se edita en el
+// archivo .env del servidor (README, "Impresora de tickets") y se aplica al
+// reiniciarlo.
+function businessCard(b, missing) {
+  const show = (v) => (v ? escapeHtml(v) : '<span class="text-slate-400">—</span>')
+  const many = (list) => (list.length ? list.map(escapeHtml).join('<br>') : show(''))
+  return card({
+    title: 'Datos del negocio en los tickets',
+    body: `
+      ${missing.length
+        ? `<div class="mb-4">${alert({
+            tone: 'warning',
+            title: 'Faltan datos',
+            message: `Sin valor: ${missing.map((m) => `<code>${m}</code>`).join(', ')}. Esas líneas no se imprimen.`
+          })}</div>`
+        : ''}
+      ${dataRow('Nombre', show(b.name))}
+      ${dataRow('Dirección', many(b.address))}
+      ${dataRow('Teléfono', show(b.phone))}
+      ${dataRow('Pie del ticket', many(b.footer))}
+    `
+  })
 }
 
 export function printResult({ error = null } = {}) {
